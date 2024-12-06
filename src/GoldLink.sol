@@ -66,9 +66,10 @@ contract GoldLink is Ownable {
     }
 
     /// @notice Retrieves the current balance of USDT held by the contract
-    /// @return The balance of USDT in the contract
+    /// @return balance The balance of USDT in the contract
     function getContractUSDTBalance() public view returns (uint256) {
-        return usdtToken.balanceOf(address(this));
+        balance = usdtToken.balanceOf(address(this));
+        return balance;
     }
 
     /// @notice Allows the contract owner to withdraw accumulated USDT
