@@ -6,7 +6,7 @@ import {AggregatorV3Interface} from "@chainlink/local/src/data-feeds/interfaces/
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title GoldLink Contract
-/// @author [Ton Nom]
+/// @author 0xNaxzerrr
 /// @notice This contract allows users to swap USDT for XAU (Gold) based on live Chainlink price feeds.
 /// @dev The contract uses Chainlink Price Feeds for XAU/USD and supports ERC-20 USDT for payments.
 contract GoldLink is Ownable {
