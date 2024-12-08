@@ -26,3 +26,14 @@ cast balance 0x18715183248AAef4687DEC37fBF792C1412b3b0B --rpc-url $RPC_URL
 cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
     "lotteryBalance()(uint256)" \
     --rpc-url $RPC_URL
+
+> Check participants in the lottery : 
+
+cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B "getParticipants()" --rpc-url $RPC_URL
+
+> Check his % of chances :
+
+cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
+    "getChances(address)(uint256)" \
+    0xF389635f844DaA5051aF879a00077C6C9F2aA345 \
+    --rpc-url $RPC_URL
