@@ -14,7 +14,9 @@ contract DeployGoldToken is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Déployer le contrat GoldLottery
-        GoldLottery goldLottery = new GoldLottery(1); // Pass subscription ID
+        GoldLottery goldLottery = new GoldLottery(
+            49224907127232505730104472195340970228059491637583329608997101105052895073023
+        ); // Pass subscription ID
 
         // Déployer le contrat GoldToken
         GoldToken goldToken = new GoldToken(
