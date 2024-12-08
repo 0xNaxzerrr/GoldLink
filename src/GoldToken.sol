@@ -13,7 +13,7 @@ import "./GoldLottery.sol";
  *         are used to fund a lottery, where a random participant wins the accumulated fees after every 1000 tokens minted.
  */
 contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
-    AggregatorV3Interface internal priceFeed; // XAU/USD : 0x214eD9Da11D2fbe465a6fc601a91E62EbEc1a0D6
+    AggregatorV3Interface internal priceFeed; // XAU/USD : 0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea
     address payable public goldLottery;
     uint256 public constant FEE_PERCENTAGE = 5;
 

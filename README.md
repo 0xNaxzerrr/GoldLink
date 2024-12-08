@@ -1,66 +1,28 @@
-## Foundry
+> Deploy contracts : 
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+forge script script/DeployGoldToken.s.sol:DeployGoldToken \
+    --rpc-url $RPC_URL \
+    --private-key $PRIVATE_KEY \
+    --broadcast \
+    --verify \
+    --etherscan-api-key $ETHERSCAN_API_KEY
 
-Foundry consists of:
+> GoldLottery deployed at: 0x18715183248AAef4687DEC37fBF792C1412b3b0B
+> GoldToken deployed at: 0xa360ecF90b6d94Edee7B1cA9447421A4F98b59A3
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+> Send some ETH to the tokencontract
 
-## Documentation
+cast send 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
+    --value 0.01ether \
+    --private-key $PRIVATE_KEY \
+    --rpc-url $RPC_URL
 
-https://book.getfoundry.sh/
+> Check goldToken contract's balance :
 
-## Usage
+cast balance 0x18715183248AAef4687DEC37fBF792C1412b3b0B --rpc-url $RPC_URL
 
-### Build
+> Check lottery contract's balance :
 
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
+    "lotteryBalance()(uint256)" \
+    --rpc-url $RPC_URL

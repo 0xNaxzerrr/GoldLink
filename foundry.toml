@@ -1,6 +1,17 @@
 [profile.default]
+# Répertoire source des fichiers Solidity
 src = "src"
+
+# Répertoire de sortie des artefacts (fichiers compilés)
 out = "out"
+
+# Répertoires de bibliothèques externes
 libs = ["lib"]
 
-# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+# Remappings utilisés pour les imports
+remappings = [
+    "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
+    "@chainlink/local/=lib/chainlink-local/"
+]
+
+
