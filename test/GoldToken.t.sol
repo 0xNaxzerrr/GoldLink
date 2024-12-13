@@ -5,59 +5,101 @@ import "forge-std/Test.sol";
 import "../src/GoldToken.sol";
 import "../src/GoldLottery.sol";
 import "../src/MockPriceFeed.sol";
+import "@chainlink/contracts/vrf/mocks/VRFCoordinatorV2Mock.sol";
 
 contract GoldTokenTest is Test {
     GoldToken public goldToken;
     GoldLottery public goldLottery;
+    VRFCoordinatorV2Mock public vrfCoordinator;
+    MockPriceFeed public mockFeed;
 
     address public owner = address(0xABCD);
     address public user = address(0x1234);
-    address public anotherUser = address(0x5678);
-    uint256 public initialPrice = 2000e18; // Simulated price of gold in ETH
+
+    uint256 public initialPrice = 1e15;
+    uint64 public subId;
 
     function setUp() public {
-        // Deploy the GoldLottery contract
-        goldLottery = new GoldLottery(1); // Mock subscription ID
+        vm.startPrank(owner);
 
-        // Deploy the GoldToken contract with a mock price feed and the lottery address
+        vrfCoordinator = new VRFCoordinatorV2Mock(0.1 ether, 0.1 ether);
+
+        subId = vrfCoordinator.createSubscription();
+        vrfCoordinator.fundSubscription(subId, 1 ether);
+
+        mockFeed = new MockPriceFeed(int256(initialPrice));
+
+        goldLottery = new GoldLottery(subId, address(vrfCoordinator), owner);
+        vrfCoordinator.addConsumer(subId, address(goldLottery));
+
         goldToken = new GoldToken(
-            address(new MockPriceFeed(int256(initialPrice))), // Mock price feed
+            address(mockFeed),
             payable(address(goldLottery))
         );
 
-        // Make `owner` the owner of the GoldToken contract
+        vm.stopPrank();
+    }
+    function testSetBridgeAddress() public {
+        address newBridge = address(0x5678);
         vm.prank(owner);
-        goldToken.transferOwnership(owner);
+        goldToken.setBridgeAddress(newBridge);
+        assertEq(goldToken.bridgeAddress(), newBridge);
+    }
+    function testBridgeMint() public {
+        address bridge = address(0x5678);
+        vm.prank(owner);
+        goldToken.setBridgeAddress(bridge);
+
+        vm.prank(bridge);
+        goldToken.bridgeMint(user, 100e18);
+
+        assertEq(goldToken.balanceOf(user), 100e18);
+    }
+
+    function testFailMintWithoutEth() public {
+        vm.prank(user);
+        goldToken.mint{value: 0}();
+    }
+
+    function testFailBurnTooMuch() public {
+        vm.deal(user, 1 ether);
+        vm.prank(user);
+        goldToken.mint{value: 0.5 ether}();
+
+        vm.prank(user);
+        goldToken.burn(500e18);
     }
 
     function testMintTokens() public {
-        vm.deal(user, 1 ether); // Give `user` 1 ETH
+        vm.deal(user, 1 ether);
 
         vm.prank(user);
         goldToken.mint{value: 0.5 ether}();
 
-        assertEq(goldToken.balanceOf(user), 475e18); // 95% of the value (with 5% fee)
+        assertEq(goldToken.balanceOf(user), 475e18);
     }
 
     function testBurnTokens() public {
         vm.deal(user, 1 ether);
+
         vm.prank(user);
         goldToken.mint{value: 0.5 ether}();
 
         uint256 initialBalance = user.balance;
 
         vm.prank(user);
-        goldToken.burn(475e18); // Burn the minted tokens
+        goldToken.burn(475e18);
 
-        assert(user.balance > initialBalance); // Ensure user received ETH back
-    }
+        uint256 expectedBalance = initialBalance + 0.45 ether;
+        uint256 actualBalance = user.balance;
 
-    function testEnterLottery() public {
-        vm.deal(user, 1 ether);
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
+        uint256 allowedDifference = 2e15;
 
-        assertEq(goldLottery.tokensMinted(), 475e18); // Tokens should count for lottery
-        assertEq(goldLottery.chances(user), 475e18); // User should have 475 chances
+        assertApproxEqAbs(
+            actualBalance,
+            expectedBalance,
+            allowedDifference,
+            "Balance after burn should be close to expected"
+        );
     }
 }

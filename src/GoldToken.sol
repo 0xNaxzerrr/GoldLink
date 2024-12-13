@@ -1,43 +1,20 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.22;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@chainlink/local/src/data-feeds/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./GoldLottery.sol";
 
-/**
- * @title GoldToken
- * @notice This ERC20 token represents gold, where 1 token = 1 gram of gold. Users can mint tokens by sending ETH,
- *         and the token supply dynamically adjusts based on mint and burn operations. Fees collected during mint and burn
- *         are used to fund a lottery, where a random participant wins the accumulated fees after every 1000 tokens minted.
- */
 contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
-    AggregatorV3Interface internal priceFeed; // XAU/USD : 0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea
+    AggregatorV3Interface internal priceFeed;
     address payable public goldLottery;
+    address public bridgeAddress;
     uint256 public constant FEE_PERCENTAGE = 5;
 
-    /**
-     * @dev Emitted when tokens are minted.
-     * @param user The address of the user who minted the tokens.
-     * @param amount The amount of tokens minted.
-     * @param fee The fee deducted during the minting process.
-     */
-    event TokensMinted(address indexed user, uint256 amount, uint256 fee);
+    event TokensMinted(address indexed user, uint256 amount, uint256 feeTokens);
+    event TokensBurned(address indexed user, uint256 amount, uint256 feeTokens);
 
-    /**
-     * @dev Emitted when tokens are burned.
-     * @param user The address of the user who burned the tokens.
-     * @param amount The amount of tokens burned.
-     * @param fee The fee deducted during the burning process.
-     */
-    event TokensBurned(address indexed user, uint256 amount, uint256 fee);
-
-    /**
-     * @notice Initializes the GoldToken contract.
-     * @param _priceFeed The address of the Chainlink price feed for gold in ETH.
-     * @param _goldLottery The address of the GoldLottery contract.
-     */
     constructor(
         address _priceFeed,
         address payable _goldLottery
@@ -46,86 +23,61 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
         goldLottery = _goldLottery;
     }
 
-    /**
-     * @notice Mint tokens based on the current price of gold in ETH.
-     * @dev The amount of ETH sent determines the number of tokens minted, based on the gold price fetched from Chainlink.
-     *      A 5% fee is deducted and sent to the lottery contract. The user's minting also registers them as a participant
-     *      in the lottery.
-     */
     function mint() external payable {
-        require(msg.value > 0, "Must send ETH to mint tokens");
-
-        // Fetch the latest price of gold in ETH
+        require(msg.value > 0, "Must send ETH");
         (, int256 price, , , ) = priceFeed.latestRoundData();
         require(price > 0, "Invalid gold price");
 
         uint256 goldPriceInEth = uint256(price);
-        uint256 goldAmount = (msg.value * 1e18) / goldPriceInEth; // Convert ETH to grams of gold
-
-        // Calculate fee
+        uint256 goldAmount = (msg.value * 1e18) / goldPriceInEth;
         uint256 fee = (goldAmount * FEE_PERCENTAGE) / 100;
         uint256 mintAmount = goldAmount - fee;
+        uint256 feeWei = (fee * goldPriceInEth) / 1e18;
 
-        // Transfer the fee to the lottery contract
-        payable(goldLottery).transfer(fee);
+        require(feeWei < msg.value, "Fee exceeds sent ETH");
 
-        // Register the user in the lottery
+        GoldLottery(goldLottery).depositFees{value: feeWei}(feeWei);
         GoldLottery(goldLottery).enterLottery(msg.sender, mintAmount);
 
-        // Deposit the fee into the lottery balance
-        GoldLottery(goldLottery).depositFees{value: fee}(fee);
-
-        // Mint the tokens to the sender
         _mint(msg.sender, mintAmount);
-
         emit TokensMinted(msg.sender, mintAmount, fee);
     }
 
-    /**
-     * @notice Burn tokens to retrieve ETH based on the current price of gold.
-     * @dev The user must hold enough tokens to burn. The ETH returned is calculated based on the gold price
-     *      fetched from Chainlink. A 5% fee is deducted and sent to the lottery contract.
-     * @param amount The amount of tokens to burn.
-     */
     function burn(uint256 amount) external {
-        require(balanceOf(msg.sender) >= amount, "Insufficient token balance");
-
-        // Fetch the latest price of gold in ETH
+        require(balanceOf(msg.sender) >= amount, "Insufficient balance");
         (, int256 price, , , ) = priceFeed.latestRoundData();
-        require(price > 0, "Invalid gold price");
+        require(price > 0, "Invalid price");
 
         uint256 goldPriceInEth = uint256(price);
         uint256 ethAmount = (amount * goldPriceInEth) / 1e18;
+        uint256 feeTokens = (amount * FEE_PERCENTAGE) / 100;
+        uint256 feeWei = (feeTokens * goldPriceInEth) / 1e18;
 
-        // Calculate fee
-        uint256 fee = (ethAmount * FEE_PERCENTAGE) / 100;
-        uint256 burnAmount = ethAmount - fee;
+        require(feeWei < ethAmount, "Fee exceeds ETH amount");
 
-        // Burn the tokens
+        uint256 burnAmount = ethAmount - feeWei;
         _burn(msg.sender, amount);
+        GoldLottery(goldLottery).depositFees{value: feeWei}(feeWei);
 
-        // Transfer the fee to the lottery contract
-        payable(goldLottery).transfer(fee);
-
-        // Send the remaining ETH to the user
         payable(msg.sender).transfer(burnAmount);
-
-        emit TokensBurned(msg.sender, amount, fee);
+        emit TokensBurned(msg.sender, amount, feeTokens);
     }
 
-    /**
-     * @notice Updates the address of the GoldLottery contract.
-     * @dev Only callable by the owner (optional, can add AccessControl if needed).
-     * @param _goldLottery The new address of the GoldLottery contract.
-     */
-    function setGoldLottery(address payable _goldLottery) external onlyOwner {
-        require(_goldLottery != address(0), "Invalid lottery address");
-        goldLottery = _goldLottery;
+    function burnFrom(address account, uint256 amount) external {
+        _spendAllowance(account, msg.sender, amount);
+        _burn(account, amount);
     }
 
-    /**
-     * @notice Fallback function to allow the contract to receive ETH directly.
-     * @dev This is required for handling ETH sent to the contract.
-     */
-    receive() external payable {}
+    function adminMint(address to, uint256 amount) external onlyOwner {
+        _mint(to, amount);
+    }
+
+    function setBridgeAddress(address _bridge) external onlyOwner {
+        bridgeAddress = _bridge;
+    }
+
+    function bridgeMint(address to, uint256 amount) external {
+        require(msg.sender == bridgeAddress, "Only bridge");
+        _mint(to, amount);
+    }
 }
