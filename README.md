@@ -7,25 +7,25 @@ forge script script/DeployGoldToken.s.sol:DeployGoldToken \
     --verify \
     --etherscan-api-key $ETHERSCAN_API_KEY
 
-> GoldLottery deployed at: 0x18715183248AAef4687DEC37fBF792C1412b3b0B
-> GoldToken deployed at: 0xa360ecF90b6d94Edee7B1cA9447421A4F98b59A3
+> GoldLottery deployed at: 0xD89f1BEdcf1a95e86406A1A61987F3D2968d99e2
+> GoldToken deployed at: 0x19893058896A4898442a9aad1413df56E3092a92
 
 > Send some ETH to the tokencontract
 
-cast send 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
+cast send 0x19893058896A4898442a9aad1413df56E3092a92 \
     --value 0.01ether \
     --private-key $PRIVATE_KEY \
     --rpc-url $RPC_URL
 
 > Check goldToken contract's balance :
 
-cast balance 0x18715183248AAef4687DEC37fBF792C1412b3b0B --rpc-url $RPC_URL
+cast balance 0x19893058896A4898442a9aad1413df56E3092a92 --rpc-url $RPC_URL
 
-> Check lottery contract's balance :
+<!-- > Check lottery contract's balance :
 
-cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
+cast call 0x19893058896A4898442a9aad1413df56E3092a92 \
     "lotteryBalance()(uint256)" \
-    --rpc-url $RPC_URL
+    --rpc-url $RPC_URL -->
 
 > Check participants in the lottery : 
 
