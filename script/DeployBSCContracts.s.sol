@@ -10,7 +10,7 @@ contract DeployBSCContracts is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address bscRouter = 0x9527E2d01A3064ef6b50c1Da1C0cC523803BCFF2;
+        address bscRouter = 0xE1053aE1857476f36A3C62580FF9b016E8EE8F6f;
 
         GoldTokenBSC goldTokenBSC = new GoldTokenBSC(address(0));
 
@@ -18,7 +18,7 @@ contract DeployBSCContracts is Script {
             bscRouter,
             address(goldTokenBSC),
             abi.encodePacked(address(0)),
-            16015286601757825753
+            13264668187771770619
         );
 
         goldTokenBSC.setBridge(address(goldBridgeBSC));

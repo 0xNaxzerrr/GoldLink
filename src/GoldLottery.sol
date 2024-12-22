@@ -1,25 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "@chainlink/contracts/vrf/interfaces/VRFCoordinatorV2Interface.sol";
-import "@chainlink/contracts/vrf/VRFConsumerBaseV2.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@chainlink/contracts/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import "@chainlink/contracts/vrf/dev/libraries/VRFV2PlusClient.sol";
+import "@chainlink/contracts/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
 
 /**
  * @title GoldLottery
  * @notice A lottery contract funded by fees collected during mint/burn operations in the GoldToken contract.
  *         A lottery is triggered every 1000 tokens minted (1000e18 units), distributing the collected fees to a random participant.
  */
-contract GoldLottery is VRFConsumerBaseV2, Ownable {
+contract GoldLottery is VRFConsumerBaseV2Plus {
     struct RequestStatus {
         bool fulfilled;
         bool exists;
         uint256[] randomWords;
     }
 
-    VRFCoordinatorV2Interface internal vrfCoordinator;
-
-    uint64 public s_subscriptionId;
+    uint256 public s_subscriptionId;
     bytes32 public keyHash;
     uint256[] public requestIds;
     uint256 public lastRequestId;
@@ -43,17 +41,16 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
     event LotteryWinner(address indexed winner, uint256 amount);
 
     constructor(
-        uint64 subscriptionId,
+        uint256 subscriptionId,
         address vrfCoordinatorAddress,
         address initialOwner
-    ) VRFConsumerBaseV2(vrfCoordinatorAddress) Ownable(initialOwner) {
-        vrfCoordinator = VRFCoordinatorV2Interface(vrfCoordinatorAddress);
+    ) VRFConsumerBaseV2Plus(vrfCoordinatorAddress) {
+        transferOwnership(initialOwner);
         s_subscriptionId = subscriptionId;
         keyHash = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
         callbackGasLimit = 100000;
         requestConfirmations = 3;
         numWords = 1; 
-        
         useNativePayment = true;
     }
 
@@ -87,12 +84,17 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
         require(participants.length > 0, "No participants in the lottery");
         require(lotteryBalance > 0, "No funds in the lottery");
 
-        requestId = vrfCoordinator.requestRandomWords(
-            keyHash,
-            s_subscriptionId,
-            requestConfirmations,
-            callbackGasLimit,
-            numWords
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: numWords,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: useNativePayment})
+                )
+            })
         );
 
         s_requests[requestId] = RequestStatus({
@@ -110,10 +112,11 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
 
     function fulfillRandomWords(
         uint256 requestId,
-        uint256[] memory randomWords
+        uint256[] calldata randomWords
     ) internal override {
         require(s_requests[requestId].exists, "Request does not exist");
         require(!s_requests[requestId].fulfilled, "Request already fulfilled");
+        require(address(this).balance >= lotteryBalance, "Insufficient contract balance");
 
         uint256 totalChances;
         for (uint256 i = 0; i < participants.length; i++) {
@@ -132,7 +135,7 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
             }
         }
 
-        (bool success, ) = winner.call{value: lotteryBalance}("");
+        (bool success, ) = payable(winner).call{value: lotteryBalance}("");
         require(success, "Transfer to winner failed");
 
         emit LotteryWinner(winner, lotteryBalance);
@@ -146,6 +149,8 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
 
         s_requests[requestId].fulfilled = true;
         s_requests[requestId].randomWords = randomWords;
+
+        resetChances();
     }
 
     function withdrawFunds(uint256 amount) external onlyOwner {
@@ -153,7 +158,14 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
             address(this).balance - lotteryBalance >= amount,
             "Insufficient funds"
         );
-        payable(msg.sender).transfer(amount);
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Transfer failed");
+    }
+
+    function resetChances() private {
+        for (uint256 i = 0; i < participants.length; i++) {
+            chances[participants[i]] = 0;
+        }
     }
 
     function getParticipants() external view returns (address[] memory) {
