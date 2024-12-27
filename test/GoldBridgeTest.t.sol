@@ -14,7 +14,8 @@ contract GoldBridgeTest is Test {
     GoldToken public goldToken;
     GoldBridge public goldBridge;
     MockRouter public mockRouter;
-    MockPriceFeed public mockFeed;
+    MockPriceFeed public mockXAU;
+    MockPriceFeed public mockETH;
     GoldLottery public goldLottery;
     VRFCoordinatorV2Mock public vrfCoordinator;
 
@@ -26,27 +27,24 @@ contract GoldBridgeTest is Test {
     function setUp() public {
         vm.startPrank(owner);
 
-
         vrfCoordinator = new VRFCoordinatorV2Mock(0.1 ether, 0.1 ether);
-
-
         subId = vrfCoordinator.createSubscription();
         vrfCoordinator.fundSubscription(subId, 1 ether);
 
-
-        mockFeed = new MockPriceFeed(1e15); 
-        
-
+        mockXAU = new MockPriceFeed(int256(1e8));
+        mockETH = new MockPriceFeed(int256(1e8));
 
         goldLottery = new GoldLottery(subId, address(vrfCoordinator), owner);
         vrfCoordinator.addConsumer(subId, address(goldLottery));
 
-
         mockRouter = new MockRouter();
+
         goldToken = new GoldToken(
-            address(mockFeed),
+            address(mockXAU),
+            address(mockETH),
             payable(address(goldLottery))
         );
+
         bytes memory remoteContract = abi.encodePacked(address(0x9999));
         goldBridge = new GoldBridge(
             address(mockRouter),
@@ -55,10 +53,7 @@ contract GoldBridgeTest is Test {
             destinationChainId
         );
 
-
         goldToken.setBridgeAddress(address(goldBridge));
-
-
         goldToken.adminMint(user, 1000e18);
 
         vm.stopPrank();
@@ -68,7 +63,6 @@ contract GoldBridgeTest is Test {
     }
 
     function testBridgeOut() public {
-        
         vm.deal(address(goldBridge), 1 ether);
         uint256 userBalanceBefore = goldToken.balanceOf(user);
         uint256 amount = 100e18;
@@ -82,13 +76,11 @@ contract GoldBridgeTest is Test {
     }
 
     function testCcipReceive() public {
-        Client.EVMTokenAmount[]
-            memory tokenAmounts = new Client.EVMTokenAmount[](1);
+        Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](1);
         tokenAmounts[0] = Client.EVMTokenAmount({
             token: address(goldToken),
             amount: 50e18
         });
-
 
         Client.Any2EVMMessage memory fakeMessage = Client.Any2EVMMessage({
             messageId: bytes32(0),
@@ -99,7 +91,6 @@ contract GoldBridgeTest is Test {
         });
 
         uint256 userBalanceBefore = goldToken.balanceOf(user);
-
 
         vm.prank(address(mockRouter));
         goldBridge.ccipReceive(fakeMessage);
