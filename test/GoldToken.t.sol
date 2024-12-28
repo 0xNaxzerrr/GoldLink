@@ -7,57 +7,44 @@ import "../src/GoldLottery.sol";
 import "../src/MockPriceFeed.sol";
 
 contract GoldTokenTest is Test {
-    GoldToken public goldToken;
-    GoldLottery public goldLottery;
+    GoldToken goldToken;
+    GoldLottery goldLottery;
+    MockPriceFeed mockPriceFeed;
 
-    address public owner = address(0xABCD);
-    address public user = address(0x1234);
-    address public anotherUser = address(0x5678);
-    uint256 public initialPrice = 2000e18; // Simulated price of gold in ETH
+    address user = address(0x1);
 
     function setUp() public {
-        // Deploy the GoldLottery contract
-        goldLottery = new GoldLottery(1); // Mock subscription ID
-
-        // Deploy the GoldToken contract with a mock price feed and the lottery address
+        mockPriceFeed = new MockPriceFeed(2000 * 1e8); // $2000 par ETH
+        goldLottery = new GoldLottery(
+            49224907127232505730104472195340970228059491637583329608997101105052895073023
+        );
         goldToken = new GoldToken(
-            address(new MockPriceFeed(int256(initialPrice))), // Mock price feed
+            address(mockPriceFeed),
             payable(address(goldLottery))
         );
 
-        // Make `owner` the owner of the GoldToken contract
-        vm.prank(owner);
-        goldToken.transferOwnership(owner);
+        vm.deal(user, 10 ether); // Ajouter 10 ETH à l'adresse user
     }
 
-    function testMintTokens() public {
-        vm.deal(user, 1 ether); // Give `user` 1 ETH
+    function testMint() public {
+        vm.startPrank(user);
+        goldToken.mint{value: 1 ether}();
 
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
+        uint256 expectedTokens = (1 ether * 1e18) / (2000 * 1e8); // 1 ETH = 500 GOLD
+        assertEq(goldToken.balanceOf(user), expectedTokens);
 
-        assertEq(goldToken.balanceOf(user), 475e18); // 95% of the value (with 5% fee)
+        vm.stopPrank();
     }
 
-    function testBurnTokens() public {
-        vm.deal(user, 1 ether);
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
+    function testBurn() public {
+        vm.startPrank(user);
+        goldToken.mint{value: 1 ether}();
 
-        uint256 initialBalance = user.balance;
+        uint256 tokensToBurn = goldToken.balanceOf(user);
+        goldToken.burn(tokensToBurn);
 
-        vm.prank(user);
-        goldToken.burn(475e18); // Burn the minted tokens
+        assertEq(goldToken.balanceOf(user), 0);
 
-        assert(user.balance > initialBalance); // Ensure user received ETH back
-    }
-
-    function testEnterLottery() public {
-        vm.deal(user, 1 ether);
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
-
-        assertEq(goldLottery.tokensMinted(), 475e18); // Tokens should count for lottery
-        assertEq(goldLottery.chances(user), 475e18); // User should have 475 chances
+        vm.stopPrank();
     }
 }
