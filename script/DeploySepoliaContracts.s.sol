@@ -51,6 +51,8 @@ contract DeploySepoliaContracts is Script {
             payable(address(goldLottery))
         );
 
+        //Prix par gramme d'or (USD) = 2620 / 31.1034768 ≈ 84.29 USD
+
         goldToken.mint{value: 0.2 ether}();
         // goldToken.adminMint(msg.sender, 1000e18);
 

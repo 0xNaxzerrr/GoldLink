@@ -50,9 +50,10 @@ Script ran successfully.
   Funded subscription with 2 LINK
   Added GoldLottery as consumer to subscription
 
-  Sepolia - GoldLottery deployed at: 0x85C23A81689D57AaCB5a5DB0142C2cECEA820047
-  Sepolia - GoldToken deployed at: 0x8d8e358a98E713F776A25412A80933C5beE8BB89
-  Sepolia - GoldBridge deployed at: 0x5803B68Cd2ABe7d5d74Eb51B52510058349234d2
+  Sepolia - GoldLottery deployed at: 0x981640A9F4A45E2BD98Aa5A639F600ef48c50e4D
+  Sepolia - GoldToken deployed at: 0x7b56758b17F91F1ff8dC3328aE3f78E5B0aBbd36
+  Sepolia - GoldBridge deployed at: 0x402d7d802242AE4Fa271a94fd141333190590827
+
 
 
 == Logs ==

@@ -65,64 +65,62 @@ contract GoldTokenTest is Test {
     }
 
     function testMintTokens() public {
-        vm.deal(user, 1 ether);
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
+    vm.deal(user, 1 ether);
+    vm.prank(user);
+    goldToken.mint{value: 0.5 ether}();
 
-        // For 0.5 ETH at 3342.26 USD/ETH = 1671.13 USD
-        // Gold at 2621.74 USD/oz
-        // 1 oz = 31.103476800 g (TROY_OUNCE_IN_GRAMS)
-        // Price per gram = 2621.74/31.103476800 = 84.29 USD/g
-        // Grams of gold = 1671.13/84.29 = 19.83g
-        // After 5% fee = 18.84g
-        uint256 expected = 188.344593783976847650e18; // The actual amount from traces
-        uint256 minted = goldToken.balanceOf(user);
-        assertApproxEqRel(minted, expected, 0.01e18);
-    }
+    uint256 expected = calculateExpectedMintAmount(0.5 ether);
+    uint256 minted = goldToken.balanceOf(user);
 
-    function testBurnTokens() public {
-        vm.deal(user, 1 ether);
-        uint256 initialBalance = user.balance;
+    assertApproxEqRel(minted, expected, 0.01e18);
+}
 
-        // Mint des tokens
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
 
-        uint256 midBalance = user.balance;
-        assertEq(midBalance, initialBalance - 0.5 ether);
+function testBurnTokens() public {
+    vm.deal(user, 1 ether);
+    uint256 initialBalance = user.balance;
 
-        uint256 minted = goldToken.balanceOf(user);
-        
-        // Brûler tous les tokens mintés
-        vm.prank(user);
-        goldToken.burn(minted);
+    vm.prank(user);
+    goldToken.mint{value: 0.5 ether}();
 
-        uint256 finalBalance = user.balance;
+    uint256 midBalance = user.balance;
+    assertEq(midBalance, initialBalance - 0.5 ether);
 
-        // Calculer le montant attendu
-        uint256 expectedBurnWei = calculateExpectedBurnWei(minted);
-        
-        // Vérifiez le montant attendu
-        assertApproxEqRel(finalBalance, midBalance + expectedBurnWei, 0.001e18);
-    }
+    uint256 minted = goldToken.balanceOf(user);
 
-    // Fonction pour calculer le montant attendu à retourner
-    function calculateExpectedBurnWei(uint256 amount) internal view returns (uint256) {
-        (, int256 xauUsdPrice, , , ) = goldToken.xauUsdFeed().latestRoundData();
-        (, int256 ethUsdPrice, , , ) = goldToken.ethUsdFeed().latestRoundData();
+    vm.prank(user);
+    goldToken.burn(minted);
 
-        uint256 xauUsd = uint256(xauUsdPrice);
-        uint256 ethUsd = uint256(ethUsdPrice);
+    uint256 finalBalance = user.balance;
 
-        uint256 gramGoldUsd = (xauUsd * 1e8) / goldToken.TROY_OUNCE_IN_GRAMS();
-        uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
+    uint256 expectedBurnWei = calculateExpectedBurnWei(
+        minted, 
+        mockXAU.price(), 
+        mockETH.price()
+    );
 
-        uint256 ethAmount = (amount * gramGoldEth) / 1e18;
-        uint256 feeTokens = (amount * goldToken.FEE_PERCENTAGE()) / 100;
-        uint256 feeWei = (feeTokens * ethAmount) / amount;
+    assertApproxEqRel(finalBalance, midBalance + expectedBurnWei, 0.001e18);
+}
 
-        return ethAmount - feeWei;
-    }
+
+function calculateExpectedBurnWei(uint256 amount, int256 xauUsdPrice, int256 ethUsdPrice) 
+    internal 
+    view 
+    returns (uint256) 
+{
+    uint256 xauUsd = uint256(xauUsdPrice);
+    uint256 ethUsd = uint256(ethUsdPrice);
+
+    uint256 gramGoldUsd = (xauUsd * 1e8) / goldToken.TROY_OUNCE_IN_GRAMS();
+    uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
+
+    uint256 ethAmount = (amount * gramGoldEth) / 1e18;
+    uint256 feeTokens = (amount * goldToken.FEE_PERCENTAGE()) / 100;
+    uint256 feeWei = (feeTokens * ethAmount) / amount;
+
+    return ethAmount - feeWei;
+}
+
     function testFailBurnTooMuch() public {
         vm.deal(user, 1 ether);
         vm.prank(user);
@@ -132,4 +130,24 @@ contract GoldTokenTest is Test {
         vm.prank(user);
         goldToken.burn(minted + 1e18); 
     }
+
+    function calculateExpectedMintAmount(uint256 ethAmount) internal view returns (uint256) {
+    uint256 xauUsd = uint256(mockXAU.price());
+    uint256 ethUsd = uint256(mockETH.price());
+
+    // Prix d'un gramme d'or en USD
+    uint256 gramGoldUsd = (xauUsd * 1e8) / goldToken.TROY_OUNCE_IN_GRAMS();
+
+    // Prix d'un gramme d'or en ETH
+    uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
+
+    // Montant d'or brut
+    uint256 goldAmount = (ethAmount * 1e18) / gramGoldEth;
+
+    // Application des frais
+    uint256 feeTokens = (goldAmount * goldToken.FEE_PERCENTAGE()) / 100;
+
+    return goldAmount - feeTokens;
+}
+
 }
