@@ -37,3 +37,14 @@ cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
     "getChances(address)(uint256)" \
     0xF389635f844DaA5051aF879a00077C6C9F2aA345 \
     --rpc-url $RPC_URL
+
+
+
+#### UPDATE : 
+
+Run the script
+forge script script/DeployGoldToken.s.sol --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY --gas-price 56000000000
+
+ MockPriceFeed deployed at: 0xF0A9E639587097Dd5913Ca33801051763B9abE80
+  GoldLottery deployed at: 0xCD0c889055ab95b173Ec2FaA0Eb1003e27D8BEB6
+  GoldToken deployed at: 0xD67b18f335A69a318F9F61F5D14168D9a86236ce

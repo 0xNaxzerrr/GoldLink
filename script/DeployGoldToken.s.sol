@@ -13,7 +13,7 @@ contract DeployGoldToken is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Déployer le MockPriceFeed
-        MockPriceFeed mockPriceFeed = new MockPriceFeed(2000 * 1e8); // $2000 par ETH
+        MockPriceFeed mockPriceFeed = new MockPriceFeed(2000 * 10 ** 8); // $2000 par ETH
 
         // Déployer GoldLottery
         GoldLottery goldLottery = new GoldLottery(

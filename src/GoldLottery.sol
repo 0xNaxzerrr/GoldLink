@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
-import {VRFConsumerBaseV2Plus} from "@chainlink/local/lib/chainlink-brownie-contracts/contracts/src/v0.8/dev/vrf/VRFConsumerBaseV2Plus.sol";
-import {VRFV2PlusClient} from "@chainlink/local/lib/chainlink-brownie-contracts/contracts/src/v0.8/dev/vrf/libraries/VRFV2PlusClient.sol";
+import "@chainlink/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+import "@chainlink/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 
 /**
  * @title GoldLottery
@@ -143,7 +143,7 @@ contract GoldLottery is VRFConsumerBaseV2Plus {
      */
     function fulfillRandomWords(
         uint256 requestId,
-        uint256[] memory randomWords
+        uint256[] calldata randomWords
     ) internal override {
         require(s_requests[requestId].exists, "Request does not exist");
         require(!s_requests[requestId].fulfilled, "Request already fulfilled");

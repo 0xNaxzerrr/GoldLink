@@ -2,9 +2,10 @@
 pragma solidity ^0.8.22;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@chainlink/local/src/data-feeds/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./GoldLottery.sol";
+import "forge-std/console.sol";
 
 /**
  * @title GoldToken
@@ -55,13 +56,20 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
     function mint() external payable {
         require(msg.value > 0, "Must send ETH to mint tokens");
 
-        // Fetch the latest price of gold in ETH
+        // Log ETH envoyé
+        console.log("ETH sent:", msg.value);
+
         (, int256 price, , , ) = priceFeed.latestRoundData();
         require(price > 0, "Invalid gold price");
+
+        // Log du prix de l'or
+        console.log("Gold price (in ETH):", uint256(price));
 
         uint256 goldPriceInEth = uint256(price);
         uint256 goldAmount = (msg.value * 1e18) / goldPriceInEth; // Convert ETH to grams of gold
 
+        // Log du montant de GOLD calculé
+        console.log("Gold amount:", goldAmount);
         // Calculate fee
         uint256 fee = (goldAmount * FEE_PERCENTAGE) / 100;
         uint256 mintAmount = goldAmount - fee;
