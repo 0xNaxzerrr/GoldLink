@@ -12,6 +12,7 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
     address payable public goldLottery;
     address public bridgeAddress;
     uint256 public constant FEE_PERCENTAGE = 5;
+    uint256 public constant TROY_OUNCE_IN_GRAMS = 31_103_476_800; 
 
     event TokensMinted(address indexed user, uint256 amount, uint256 feeTokens);
     event TokensBurned(address indexed user, uint256 amount, uint256 feeTokens);
@@ -36,10 +37,15 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
         uint256 xauUsd = uint256(xauUsdPrice);
         uint256 ethUsd = uint256(ethUsdPrice);
 
-        uint256 xauEthPrice = (xauUsd * 1e8) / ethUsd;
-        require(xauEthPrice > 0, "Invalid ratio");
+        // Prix d'un gramme d'or en USD (avec 8 décimales)
+        uint256 gramGoldUsd = (xauUsd * 1e8) / TROY_OUNCE_IN_GRAMS;
+        
+        // Prix d'un gramme d'or en ETH (avec 18 décimales)
+        uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
+        require(gramGoldEth > 0, "Invalid ratio");
 
-        uint256 goldAmount = (msg.value * 1e18) / xauEthPrice;
+        // Nombre de grammes d'or (tokens) qu'on peut acheter avec msg.value
+        uint256 goldAmount = (msg.value * 1e18) / gramGoldEth;
 
         uint256 feeTokens = (goldAmount * FEE_PERCENTAGE) / 100;
         uint256 mintAmount = goldAmount - feeTokens;
@@ -64,10 +70,14 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
         uint256 xauUsd = uint256(xauUsdPrice);
         uint256 ethUsd = uint256(ethUsdPrice);
 
-        uint256 xauEthPrice = (xauUsd * 1e8) / ethUsd;
-        require(xauEthPrice > 0, "Invalid ratio");
+        // Prix d'un gramme d'or en USD (avec 8 décimales)
+        uint256 gramGoldUsd = (xauUsd * 1e8) / TROY_OUNCE_IN_GRAMS;
+        
+        // Prix d'un gramme d'or en ETH (avec 18 décimales)
+        uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
+        require(gramGoldEth > 0, "Invalid ratio");
 
-        uint256 ethAmount = (amount * xauEthPrice) / 1e18;
+        uint256 ethAmount = (amount * gramGoldEth) / 1e18;
 
         uint256 feeTokens = (amount * FEE_PERCENTAGE) / 100;
         uint256 feeWei = (feeTokens * ethAmount) / amount;
