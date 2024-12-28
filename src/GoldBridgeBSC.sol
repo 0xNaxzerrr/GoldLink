@@ -38,7 +38,7 @@ contract GoldBridgeBSC is CCIPReceiver, Ownable {
         return 
             interfaceId == type(IAny2EVMMessageReceiver).interfaceId || 
             interfaceId == type(IERC165).interfaceId;
-    }
+    } 
     function _ccipReceive(
         Client.Any2EVMMessage memory message
     ) internal override {

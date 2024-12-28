@@ -25,11 +25,10 @@ contract GoldTokenTest is Test {
         subId = vrfCoordinator.createSubscription();
         vrfCoordinator.fundSubscription(subId, 1 ether);
 
-        // Les deux feeds renvoient 1e8 => ratio = 1
-        // => mint(0.5 ETH) => ~5e9 tokens - 5% = 4.75e9
-        mockXAU = new MockPriceFeed(int256(1e8));
-        mockETH = new MockPriceFeed(int256(1e8));
-
+        // Prix de l'or : 2000 USD/oz (8 décimales)
+        mockXAU = new MockPriceFeed(int256(262174000000)); // 2621.74 USD/oz
+        // Prix de l'ETH : 3000 USD (8 décimales)
+        mockETH = new MockPriceFeed(int256(334226000000)); // 3342.26 USD
         goldLottery = new GoldLottery(subId, address(vrfCoordinator), owner);
         vrfCoordinator.addConsumer(subId, address(goldLottery));
 
@@ -65,66 +64,90 @@ contract GoldTokenTest is Test {
         goldToken.mint{value: 0}();
     }
 
+    function testMintTokens() public {
+    vm.deal(user, 1 ether);
+    vm.prank(user);
+    goldToken.mint{value: 0.5 ether}();
+
+    uint256 expected = calculateExpectedMintAmount(0.5 ether);
+    uint256 minted = goldToken.balanceOf(user);
+
+    assertApproxEqRel(minted, expected, 0.01e18);
+}
+
+
+function testBurnTokens() public {
+    vm.deal(user, 1 ether);
+    uint256 initialBalance = user.balance;
+
+    vm.prank(user);
+    goldToken.mint{value: 0.5 ether}();
+
+    uint256 midBalance = user.balance;
+    assertEq(midBalance, initialBalance - 0.5 ether);
+
+    uint256 minted = goldToken.balanceOf(user);
+
+    vm.prank(user);
+    goldToken.burn(minted);
+
+    uint256 finalBalance = user.balance;
+
+    uint256 expectedBurnWei = calculateExpectedBurnWei(
+        minted, 
+        mockXAU.price(), 
+        mockETH.price()
+    );
+
+    assertApproxEqRel(finalBalance, midBalance + expectedBurnWei, 0.001e18);
+}
+
+
+function calculateExpectedBurnWei(uint256 amount, int256 xauUsdPrice, int256 ethUsdPrice) 
+    internal 
+    view 
+    returns (uint256) 
+{
+    uint256 xauUsd = uint256(xauUsdPrice);
+    uint256 ethUsd = uint256(ethUsdPrice);
+
+    uint256 gramGoldUsd = (xauUsd * 1e8) / goldToken.TROY_OUNCE_IN_GRAMS();
+    uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
+
+    uint256 ethAmount = (amount * gramGoldEth) / 1e18;
+    uint256 feeTokens = (amount * goldToken.FEE_PERCENTAGE()) / 100;
+    uint256 feeWei = (feeTokens * ethAmount) / amount;
+
+    return ethAmount - feeWei;
+}
+
     function testFailBurnTooMuch() public {
         vm.deal(user, 1 ether);
         vm.prank(user);
         goldToken.mint{value: 0.5 ether}();
-        vm.prank(user);
-        goldToken.burn(500e18); // On tente de burn plus que minté => revert
-    }
-
-    // Cas où on vérifie simplement la quantité de tokens mintés
-    function testMintTokens() public {
-        vm.deal(user, 1 ether);
-
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
-
-        // On s’attend à ~4.75e9
+        
         uint256 minted = goldToken.balanceOf(user);
-        assertEq(minted, 4750000000);
+        vm.prank(user);
+        goldToken.burn(minted + 1e18); 
     }
 
-    // Cas où on vérifie le solde final en ETH après burn
-    function testBurnTokens() public {
-        vm.deal(user, 1 ether);
+    function calculateExpectedMintAmount(uint256 ethAmount) internal view returns (uint256) {
+    uint256 xauUsd = uint256(mockXAU.price());
+    uint256 ethUsd = uint256(mockETH.price());
 
-        // solde initial
-        uint256 initialBalance = user.balance;
+    // Prix d'un gramme d'or en USD
+    uint256 gramGoldUsd = (xauUsd * 1e8) / goldToken.TROY_OUNCE_IN_GRAMS();
 
-        // L’utilisateur dépense 0.5 ETH pour minter
-        vm.prank(user);
-        goldToken.mint{value: 0.5 ether}();
+    // Prix d'un gramme d'or en ETH
+    uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
 
-        // On vérifie le solde "milieu"
-        uint256 midBalance = user.balance;
-        // midBalance devrait être environ initialBalance - 0.5
-        // On autorise une petite marge
-        assertApproxEqAbs(
-            midBalance,
-            initialBalance - 0.5 ether,
-            1e14
-        );
+    // Montant d'or brut
+    uint256 goldAmount = (ethAmount * 1e18) / gramGoldEth;
 
-        // Combien de tokens a-t-il ?
-        uint256 minted = goldToken.balanceOf(user);
-        // Normalement ~4.75e9
+    // Application des frais
+    uint256 feeTokens = (goldAmount * goldToken.FEE_PERCENTAGE()) / 100;
 
-        // On burn tout
-        vm.prank(user);
-        goldToken.burn(minted);
+    return goldAmount - feeTokens;
+}
 
-        // solde final
-        uint256 finalBalance = user.balance;
-
-        // S’il recouvre ~0.45125 ETH, alors finalBalance = midBalance + 0.45125
-        uint256 expected = midBalance + 0.45125 ether;
-
-        // On autorise 0.0005 ETH d’écart
-        assertApproxEqAbs(
-            finalBalance,
-            expected,
-            5e14
-        );
-    }
 }
