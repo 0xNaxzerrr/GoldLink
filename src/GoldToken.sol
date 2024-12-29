@@ -2,9 +2,10 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@chainlink/local/src/data-feeds/interfaces/AggregatorV3Interface.sol";
+import "@chainlink/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./GoldLottery.sol";
+import "forge-std/console.sol";
 
 contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
     AggregatorV3Interface public xauUsdFeed;

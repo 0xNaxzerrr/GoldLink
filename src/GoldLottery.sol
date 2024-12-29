@@ -52,8 +52,8 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
         keyHash = 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae;
         callbackGasLimit = 100000;
         requestConfirmations = 3;
-        numWords = 1; 
-        
+        numWords = 1;
+
         useNativePayment = true;
     }
 
@@ -71,7 +71,6 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
         chances[participant] += amount;
 
         emit LotteryEntered(participant, amount);
-
 
         if (tokensMinted >= 1000e18) {
             drawLottery();
@@ -110,7 +109,7 @@ contract GoldLottery is VRFConsumerBaseV2, Ownable {
 
     function fulfillRandomWords(
         uint256 requestId,
-        uint256[] memory randomWords
+        uint256[] calldata randomWords
     ) internal override {
         require(s_requests[requestId].exists, "Request does not exist");
         require(!s_requests[requestId].fulfilled, "Request already fulfilled");

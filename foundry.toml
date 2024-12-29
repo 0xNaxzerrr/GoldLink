@@ -8,9 +8,13 @@ out = "out"
 # Répertoires de bibliothèques externes
 libs = ["lib"]
 
-# Remappings utilisés pour les imports
+[profile.default.env]
+PRIVATE_KEY="0xbaa0de9e03d33fe38c926b1482d62b486850f99f26f4f4ba3feb00175a879e1c"
+RPC_URL="https://eth-sepolia.g.alchemy.com/v2/kxkEycx0RmL6b0ObbBPgGgxiduR9Qhew"
+
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@chainlink/local/=lib/chainlink-local/",
-    "@chainlink/contracts/=lib/chainlink/contracts/src/v0.8/",
+    "@chainlink/local/=lib/chainlink/"
 ]
+
+
