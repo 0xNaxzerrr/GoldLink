@@ -65,6 +65,7 @@ contract GoldLotteryTest is Test {
         );
 
         uint256 balance = address(goldLottery).balance;
+        
         console.log("Balance:", balance);
 
         vm.prank(owner);

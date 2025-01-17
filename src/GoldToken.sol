@@ -30,37 +30,29 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
     function mint() external payable {
     require(msg.value > 0, "Must send ETH");
 
-    // Récupération des prix des oracles
     (, int256 xauUsdPrice, , , ) = xauUsdFeed.latestRoundData();
     (, int256 ethUsdPrice, , , ) = ethUsdFeed.latestRoundData();
     require(xauUsdPrice > 0 && ethUsdPrice > 0, "Invalid feeds");
 
-    uint256 xauUsd = uint256(xauUsdPrice); // Prix de l'or en USD (8 décimales)
-    uint256 ethUsd = uint256(ethUsdPrice); // Prix de l'ETH en USD (8 décimales)
+    uint256 xauUsd = uint256(xauUsdPrice); 
+    uint256 ethUsd = uint256(ethUsdPrice); 
 
-    // Prix d'un gramme d'or en USD (8 décimales)
     uint256 gramGoldUsd = (xauUsd * 1e8) / TROY_OUNCE_IN_GRAMS;
 
-    // Prix d'un gramme d'or en ETH (19 décimales)
     uint256 gramGoldEth = (gramGoldUsd * 1e19) / ethUsd;
     require(gramGoldEth > 0, "Invalid ratio");
 
-    // Nombre de grammes d'or (tokens) qu'on peut acheter avec msg.value
     uint256 goldAmount = (msg.value * 1e18) / gramGoldEth;
 
-    // Application des frais
     uint256 feeTokens = (goldAmount * FEE_PERCENTAGE) / 100;
     uint256 mintAmount = goldAmount - feeTokens;
 
-    // Calcul des frais en wei
     uint256 feeWei = (msg.value * feeTokens) / goldAmount;
     require(feeWei < msg.value, "Fee too high");
 
-    // Dépôt des frais et participation à la loterie
     GoldLottery(goldLottery).depositFees{value: feeWei}(feeWei);
     GoldLottery(goldLottery).enterLottery(msg.sender, mintAmount);
 
-    // Mint des tokens
     _mint(msg.sender, mintAmount);
 
     emit TokensMinted(msg.sender, mintAmount, feeTokens);
@@ -76,10 +68,8 @@ contract GoldToken is ERC20("GoldToken", "GOLD"), Ownable {
         uint256 xauUsd = uint256(xauUsdPrice);
         uint256 ethUsd = uint256(ethUsdPrice);
 
-        // Prix d'un gramme d'or en USD (avec 8 décimales)
         uint256 gramGoldUsd = (xauUsd * 1e8) / TROY_OUNCE_IN_GRAMS;
         
-        // Prix d'un gramme d'or en ETH (avec 18 décimales)
         uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
         require(gramGoldEth > 0, "Invalid ratio");
 
