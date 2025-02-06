@@ -1,16 +1,12 @@
 [profile.default]
-# Répertoire source des fichiers Solidity
 src = "src"
-
-# Répertoire de sortie des artefacts (fichiers compilés)
 out = "out"
-
-# Répertoires de bibliothèques externes
 libs = ["lib"]
 
-# Remappings utilisés pour les imports
 remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
-    "@chainlink/local/=lib/chainlink-local/",
+    "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "@chainlink/contracts/=lib/chainlink/contracts/src/v0.8/",
+    "@chainlink-local/=lib/chainlink-local/src/",
+    "@chainlink/vrf/=lib/ccip/contracts/src/v0.8/vrf/"
 ]

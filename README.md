@@ -45,19 +45,23 @@ forge script script/DeployGoldToken.s.sol:DeployGoldToken     --rpc-url $RPC_URL
 
 Script ran successfully.
 
-== Logs ==
-  Created subscription with ID: 12223
-  Funded subscription with 2 LINK
-  Added GoldLottery as consumer to subscription
-
-Sepolia - GoldLottery: 0xB4117EbD882C0358d3438d5121Bf813AE0F7Ff6D
-Sepolia - GoldToken: 0xaBFd99e71b41Bf494858A576215c165FA54Db955
-Sepolia - GoldBridge: 0xC482ab757Bcd25914E33Af8FD043EB8410150f7D
 
 
 == Logs ==
-  BSC - GoldTokenBSC deployed at: 0x205045D7dDb69bd6348129a445C9237B4b3c851E
-  BSC - GoldBridgeBSC deployed at: 0x40f35685b9e6F3F4d567224B6470d0a60581eB79
+  Created VRF subscription: 72505492050481404530201281463226024964224110164911129287313511204618353878730
+  Created VRF subscription (hex): 72505492050481404530201281463226024964224110164911129287313511204618353878730
+  Created VRF subscription (dec): 72505492050481404530201281463226024964224110164911129287313511204618353878730
+  Funded subscription with 2eth
+  Added Lottery as VRF consumer
+  Deployed contracts:
+  Lottery: 0xdD6e6C295eB874B9A801110C0d4627D0cD12d875
+  Token: 0x4DE2DF46C1B8902435EAaC826D5D5497BB6CE467
+  Bridge: 0x3602187ff4Ad98C6f5d27e71655939886fBf5432
+
+
+== Logs ==
+  BSC - GoldTokenBSC deployed at: 0x02FACFc2cd5E273baA543FA4afC4f77DC0E6c891
+  BSC - GoldBridgeBSC deployed at: 0x400a5f8D3636A697973f5be14B222de8aa3074d7
 
 
 ====================== MODE D'EMPLOI =========================

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
-import "../src/GoldBridge.sol";
-import "../src/GoldBridgeBSC.sol";
+import "../src/bridge/GoldBridge.sol";
+import "../src/bridge/GoldBridgeBSC.sol";
 
 contract ConfigureRemoteAddresses is Script {
     function run() external {

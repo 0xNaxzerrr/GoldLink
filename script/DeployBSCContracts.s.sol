@@ -2,8 +2,8 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Script.sol";
-import "../src/GoldTokenBSC.sol";
-import "../src/GoldBridgeBSC.sol";
+import "../src/tokens/GoldTokenBSC.sol";
+import "../src/bridge/GoldBridgeBSC.sol";
 
 contract DeployBSCContracts is Script {
     function run() external {
@@ -12,15 +12,16 @@ contract DeployBSCContracts is Script {
 
         address bscRouter = 0xE1053aE1857476f36A3C62580FF9b016E8EE8F6f;
 
-        GoldTokenBSC goldTokenBSC = new GoldTokenBSC(address(0));
+        GoldTokenBSC goldTokenBSC = new GoldTokenBSC();
 
         GoldBridgeBSC goldBridgeBSC = new GoldBridgeBSC(
             bscRouter,
             address(goldTokenBSC),
             abi.encodePacked(address(0)),
-            13264668187771770619
+            16015286601757825753 
         );
 
+        goldBridgeBSC.initialize();
         goldTokenBSC.setBridge(address(goldBridgeBSC));
 
         console.log("BSC - GoldTokenBSC deployed at:", address(goldTokenBSC));
