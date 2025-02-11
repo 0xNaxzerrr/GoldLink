@@ -12,23 +12,27 @@ import "forge-std/console2.sol";
 /// @title Gold Token with Price Oracle and UUPS Upgrades
 /// @notice ERC20 token tracking gold price with bridge capabilities
 /// @dev Implements Chainlink price feeds, UUPS pattern and bridging functionality
-contract GoldToken is IGoldToken, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgradeable {
-
+contract GoldToken is
+    IGoldToken,
+    ERC20Upgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
     /// @notice XAU/USD price feed from Chainlink
     AggregatorV3Interface public immutable xauUsdFeed;
-    
+
     /// @notice ETH/USD price feed from Chainlink
     AggregatorV3Interface public immutable ethUsdFeed;
-    
+
     /// @notice Lottery contract address
     address payable public immutable goldLottery;
-    
+
     /// @notice Bridge contract address for cross-chain transfers
     address public bridgeAddress;
 
     /// @notice Fee percentage applied on mint/burn operations (5%)
     uint256 public constant FEE_PERCENTAGE = 5;
-    
+
     uint256 private constant STALENESS_PERIOD = 1 hours;
 
     uint256 public constant TROY_OUNCE_IN_GRAMS = 31_103_476_800;
@@ -39,8 +43,11 @@ contract GoldToken is IGoldToken, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgr
         address _ethUsdFeed,
         address payable _goldLottery
     ) {
-        if (_xauUsdFeed == address(0) || _ethUsdFeed == address(0) || _goldLottery == address(0)) 
-            revert InvalidValue();
+        if (
+            _xauUsdFeed == address(0) ||
+            _ethUsdFeed == address(0) ||
+            _goldLottery == address(0)
+        ) revert InvalidValue();
         xauUsdFeed = AggregatorV3Interface(_xauUsdFeed);
         ethUsdFeed = AggregatorV3Interface(_ethUsdFeed);
         goldLottery = _goldLottery;
@@ -59,15 +66,30 @@ contract GoldToken is IGoldToken, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgr
     function mint() external payable {
         require(msg.value > 0, "Must send ETH");
 
-        (, int256 xauUsdPrice, , , ) = xauUsdFeed.latestRoundData();
-        (, int256 ethUsdPrice, , , ) = ethUsdFeed.latestRoundData();
-        require(xauUsdPrice > 0 && ethUsdPrice > 0, "Invalid feeds");
+        console2.log("Mint - Msg value:", msg.value);
 
-        uint256 xauUsd = uint256(xauUsdPrice); 
-        uint256 ethUsd = uint256(ethUsdPrice); 
+        (, int256 xauUsdPrice, , uint256 xauUpdatedAt, ) = xauUsdFeed
+            .latestRoundData();
+        (, int256 ethUsdPrice, , uint256 ethUpdatedAt, ) = ethUsdFeed
+            .latestRoundData();
+
+        console2.log("XAU USD Price:", uint256(xauUsdPrice));
+        console2.log("ETH USD Price:", uint256(ethUsdPrice));
+
+        require(xauUsdPrice > 0 && ethUsdPrice > 0, "Invalid feeds");
+        require(
+            block.timestamp - xauUpdatedAt <= STALENESS_PERIOD,
+            "XAU price feed is stale"
+        );
+        require(
+            block.timestamp - ethUpdatedAt <= STALENESS_PERIOD,
+            "ETH price feed is stale"
+        );
+
+        uint256 xauUsd = uint256(xauUsdPrice);
+        uint256 ethUsd = uint256(ethUsdPrice);
 
         uint256 gramGoldUsd = (xauUsd * 1e8) / TROY_OUNCE_IN_GRAMS;
-
         uint256 gramGoldEth = (gramGoldUsd * 1e19) / ethUsd;
         require(gramGoldEth > 0, "Invalid ratio");
 
@@ -76,9 +98,15 @@ contract GoldToken is IGoldToken, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgr
         uint256 feeTokens = (goldAmount * FEE_PERCENTAGE) / 100;
         uint256 mintAmount = goldAmount - feeTokens;
 
-        uint256 feeWei = (msg.value * feeTokens) / goldAmount;
+        uint256 feeWei = (msg.value * FEE_PERCENTAGE) / 100;
         require(feeWei < msg.value, "Fee too high");
 
+        console2.log("Gold Amount:", goldAmount);
+        console2.log("Fee Tokens:", feeTokens);
+        console2.log("Mint Amount:", mintAmount);
+        console2.log("Fee Wei:", feeWei);
+
+        // Appels externes avec require standard
         IGoldLottery(goldLottery).depositFees{value: feeWei}(feeWei);
         IGoldLottery(goldLottery).enterLottery(msg.sender, mintAmount);
 
@@ -127,7 +155,7 @@ contract GoldToken is IGoldToken, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgr
     /// @notice Allows owner to mint tokens
     /// @param to Recipient address
     /// @param amount Amount to mint
-     function adminMint(address to, uint256 amount) external onlyOwner {
+    function adminMint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
 
@@ -149,5 +177,7 @@ contract GoldToken is IGoldToken, ERC20Upgradeable, OwnableUpgradeable, UUPSUpgr
     /// @notice Authorizes an upgrade to a new implementation
     /// @dev Only owner can upgrade the contract
     /// @param newImplementation Address of new implementation
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }
