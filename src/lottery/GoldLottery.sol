@@ -3,14 +3,12 @@ pragma solidity ^0.8.24;
 
 import {IVRFCoordinatorV2Plus} from "@chainlink/contracts/vrf/dev/interfaces/IVRFCoordinatorV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/vrf/dev/libraries/VRFV2PlusClient.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {VRFConsumerBaseV2Plus} from "@chainlink/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import "../interfaces/IGoldLottery.sol";
 
-contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
-    IVRFCoordinatorV2Plus private immutable vrfCoordinator;
-    
-    bytes32 private immutable KEY_HASH;    
+contract GoldLottery is IGoldLottery, VRFConsumerBaseV2Plus {
+    error TransferFailed();
+    bytes32 private immutable KEY_HASH;
     uint256 private immutable SUBSCRIPTION_ID;
     uint32 private immutable CALLBACK_GAS_LIMIT;
     uint16 private immutable REQUEST_CONFIRMATIONS;
@@ -37,23 +35,17 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         uint256 _subscriptionId,
         uint32 _callbackGasLimit,
         uint16 _requestConfirmations
-    ) {
+    ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
         require(_callbackGasLimit >= 100000, "Callback gas limit too low");
         require(_requestConfirmations >= 3, "Min confirmations not met");
-        
-        vrfCoordinator = IVRFCoordinatorV2Plus(_vrfCoordinator);
+
         KEY_HASH = _keyHash;
         SUBSCRIPTION_ID = _subscriptionId;
         CALLBACK_GAS_LIMIT = _callbackGasLimit;
         REQUEST_CONFIRMATIONS = _requestConfirmations;
     }
 
-    function initialize() external override initializer {
-        __Ownable_init(msg.sender);
-        __UUPSUpgradeable_init();
-    }
-
-    function enterLottery(address participant, uint256 amount) external override {
+    function enterLottery(address participant, uint256 amount) external {
         if (participant == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
 
@@ -62,15 +54,14 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         chances[participant] += amount;
 
         emit LotteryEntered(participant, amount);
-
     }
 
-    function depositFees(uint256 amount) external payable override {
-        if (msg.value != amount) revert InvalidAmount();
+    function depositFees(uint256 amount) external payable {
+        require(msg.value >= amount, "Insufficient fee amount");
         lotteryBalance += amount;
     }
 
-    function drawLottery() external override onlyOwner returns (uint256) {
+    function drawLottery() external onlyOwner returns (uint256) {
         return _drawLottery();
     }
 
@@ -78,18 +69,19 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         if (participants.length == 0) revert NoParticipants();
         if (lotteryBalance == 0) revert NoBalance();
 
-        requestId = vrfCoordinator.requestRandomWords(
-            VRFV2PlusClient.RandomWordsRequest({
-                keyHash: KEY_HASH,
-                subId: SUBSCRIPTION_ID,
-                requestConfirmations: REQUEST_CONFIRMATIONS,
-                callbackGasLimit: CALLBACK_GAS_LIMIT,
-                numWords: NUM_WORDS,
-                extraArgs: VRFV2PlusClient._argsToBytes(
-                    VRFV2PlusClient.ExtraArgsV1({nativePayment: NATIVE_PAYMENT})
-                )
-            })
-        );
+        requestId = IVRFCoordinatorV2Plus(address(s_vrfCoordinator))
+            .requestRandomWords(
+                VRFV2PlusClient.RandomWordsRequest({
+                    keyHash: KEY_HASH,
+                    subId: SUBSCRIPTION_ID,
+                    requestConfirmations: REQUEST_CONFIRMATIONS,
+                    callbackGasLimit: CALLBACK_GAS_LIMIT,
+                    numWords: NUM_WORDS,
+                    extraArgs: VRFV2PlusClient._argsToBytes(
+                        VRFV2PlusClient.ExtraArgsV1({nativePayment: true})
+                    )
+                })
+            );
 
         s_requests[requestId] = RequestStatus({
             randomWords: new uint256[](NUM_WORDS),
@@ -101,12 +93,10 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         return requestId;
     }
 
-    function rawFulfillRandomWords(uint256 requestId, uint256[] memory randomWords) external {
-        require(msg.sender == address(vrfCoordinator), "Only VRFCoordinator");
-        fulfillRandomWords(requestId, randomWords);
-    }
-
-    function fulfillRandomWords(uint256 requestId, uint256[] memory randomWords) internal virtual {
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] calldata randomWords
+    ) internal override {
         if (!s_requests[requestId].exists) revert RequestNotExists();
         if (s_requests[requestId].fulfilled) revert RequestAlreadyFulfilled();
 
@@ -142,32 +132,35 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         lotteryBalance = 0;
         lastWinner = winner;
         lastPayout = prize;
-        
-        (bool success,) = winner.call{value: prize}("");
-        if (!success) revert();
-        
+
+        (bool success, ) = winner.call{value: prize}("");
+        if (!success) revert TransferFailed();
+
         emit LotteryWinner(winner, prize);
     }
 
-    function _resetLottery(uint256 requestId, uint256[] memory randomWords) private {
+    function _resetLottery(
+        uint256 requestId,
+        uint256[] memory randomWords
+    ) private {
         s_requests[requestId].fulfilled = true;
         s_requests[requestId].randomWords = randomWords;
-        
+
         for (uint256 i = 0; i < participants.length; i++) {
             chances[participants[i]] = 0;
         }
         delete participants;
         tokensMinted = 0;
-        
+
         emit RequestFulfilled(requestId, randomWords);
     }
 
-    function setCoordinator(address newCoordinator) external override onlyOwner {
-        if (newCoordinator == address(0)) revert InvalidAddress();
-        revert("Coordinator can't be changed - immutable");
-    }
-
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    // function setCoordinator(
+    //     address newCoordinator
+    // ) external override(IGoldLottery, VRFConsumerBaseV2Plus) onlyOwner {
+    //     if (newCoordinator == address(0)) revert InvalidAddress();
+    //     revert("Coordinator can't be changed - immutable");
+    // }
 
     function getParticipants() external view returns (address[] memory) {
         return participants;
