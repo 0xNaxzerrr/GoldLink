@@ -7,18 +7,35 @@ import "../src/bridge/GoldBridge.sol";
 import "../src/tokens/GoldToken.sol";
 
 contract DeploySepoliaContracts is Script {
-    address constant sepoliaRouter = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
-    address constant xauUsdFeed = 0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea;
-    address constant ethUsdFeed = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
-    address constant LOTTERY_ADDRESS = 0xC665024dcBAACF27AFfa62eb0F968D81E433AF92;
-    uint64 constant BNB_CHAIN_SELECTOR = 13264668187771770619;
-    address constant linkToken = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
+    address sepoliaRouter;
+    address xauUsdFeed;
+    address ethUsdFeed;
+    address LOTTERY_ADDRESS;
+    address linkToken;
+    uint64 BNB_CHAIN_SELECTOR;
+
+    function setUp() public {
+        sepoliaRouter = vm.envAddress("ROUTER_ETH");
+        xauUsdFeed = vm.envAddress("XAU_USD_FEED");
+        ethUsdFeed = vm.envAddress("ETH_USD_FEED");
+        LOTTERY_ADDRESS = vm.envAddress("LOTTERY_ADDRESS");
+        linkToken = vm.envAddress("LINK_SEPOLIA");
+        BNB_CHAIN_SELECTOR = uint64(vm.envUint("BNB_CHAIN_SELECTOR"));
+    }
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        address deployer = vm.addr(deployerPrivateKey);
+
+        // Récupérer le nonce correct
+        uint256 currentNonce = vm.getNonce(deployer);
+        console2.log("Current Nonce:", currentNonce);
+
+        uint256 gasPrice = block.basefee * 2; // Ou utilisez une valeur fixe
+        vm.txGasPrice(gasPrice);
+
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy token avec l'adresse de la lottery existante
         GoldToken goldToken = new GoldToken(
             xauUsdFeed,
             ethUsdFeed,
@@ -35,14 +52,14 @@ contract DeploySepoliaContracts is Script {
 
         // Deploy bridge
         GoldBridge goldBridge = new GoldBridge(
-            sepoliaRouter,            
-            address(goldToken),        
-            linkToken, 
-            abi.encodePacked(address(0)), 
-            BNB_CHAIN_SELECTOR      
+            sepoliaRouter,
+            address(goldToken),
+            linkToken,
+            abi.encodePacked(address(0)),
+            BNB_CHAIN_SELECTOR
         );
         goldBridge.initialize();
-        
+
         // Configure token avec l'adresse du bridge
         goldToken.setBridgeAddress(address(goldBridge));
         goldToken.approve(address(goldBridge), type(uint256).max);
