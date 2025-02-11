@@ -8,5 +8,6 @@ remappings = [
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "@chainlink/contracts/=lib/chainlink/contracts/src/v0.8/",
     "@chainlink-local/=lib/chainlink-local/src/",
-    "@chainlink/vrf/=lib/ccip/contracts/src/v0.8/vrf/"
+    "@chainlink/vrf/=lib/ccip/contracts/src/v0.8/vrf/",
+    "@chainlink/ccip/=lib/ccip/contract/src/v0.8"
 ]
