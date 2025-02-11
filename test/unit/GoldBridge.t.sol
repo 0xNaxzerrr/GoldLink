@@ -2,110 +2,150 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
-import "forge-std/console2.sol";  // Changement vers console2
+import "forge-std/console2.sol";
 import "../../src/bridge/GoldBridge.sol";
 import "../../src/tokens/GoldToken.sol";
 import "../mocks/RouterMock.sol";
-import "../mocks/PriceFeedMock.sol"; // Ajout de l'import
+import "../mocks/PriceFeedMock.sol";
+import "../mocks/LinkTokenMock.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@chainlink/contracts/ccip/libraries/Client.sol";
 
 contract GoldBridgeTest is Test {
-    GoldBridge public implementation;
+    GoldBridge public initGoldBridge;
     GoldBridge public bridge;
     GoldToken public token;
-    RouterMock public router;
+    IRouterClient public router;
+    LinkTokenMock public linkToken;
 
-    // Paramètres de test
-    address alice = makeAddr("alice");
-    address bob = makeAddr("bob");
-    bytes remoteContract = hex"1234"; // Format hexadécimal correct
-    uint64 destinationChainId = 97; // BSC Testnet
+    uint64 constant BSC_TESTNET_SELECTOR = 12532609583862916517;  
+    bytes constant REMOTE_CONTRACT = hex"1234567890abcdef1234567890abcdef12345678"; 
     uint256 constant INITIAL_BALANCE = 1000 ether;
     uint256 constant BRIDGE_FUNDS = 100 ether;
 
+    // Test addresses
+    address alice = makeAddr("alice");
+    address bob = makeAddr("bob");
+    address owner = address(this);
+
     event MessageSent(
-        bytes32 indexed messageId, 
+        bytes32 indexed messageId,
         uint64 indexed destinationChainId,
         address recipient,
         uint256 amount
     );
     event TokensBridged(address indexed recipient, uint256 amount);
-    event FundsReceived(address sender, uint256 amount);
 
     function setUp() public {
         vm.warp(1000);
         console2.log("=== Debug Setup Start ===");
-        address owner = address(this);
-        
-        // 1. Mock Setup
+
+        // 1) Déploie les mocks
         router = new RouterMock();
+        linkToken = new LinkTokenMock();
+
         PriceFeedMock xauUsdFeed = new PriceFeedMock();
         PriceFeedMock ethUsdFeed = new PriceFeedMock();
-        
         xauUsdFeed.setPrice(2000 * 1e8);
         ethUsdFeed.setPrice(3000 * 1e8);
-        console2.log("Mocks configured");
 
-        // 2. Token Setup
+        // 2) Déploie et initialise le token
         token = new GoldToken(
             address(xauUsdFeed),
             address(ethUsdFeed),
             payable(owner)
         );
-        
-        vm.startPrank(owner);
         token.initialize();
-        require(token.owner() == owner, "Token init failed");
-        vm.stopPrank();
-        console2.log("Token setup complete at:", address(token));
 
-        // 3. Bridge Setup
-        implementation = new GoldBridge(
+        // 3) Déploie le bridge avec proxy
+        initGoldBridge = new GoldBridge(
             address(router),
             address(token),
-            remoteContract,
-            destinationChainId
+            address(linkToken),
+            REMOTE_CONTRACT,
+            BSC_TESTNET_SELECTOR
         );
-        require(address(implementation) != address(0), "Bridge impl failed");
-        console2.log("Bridge impl at:", address(implementation));
 
-        // 4. Create and Initialize Proxy
-        bytes memory initData = "";
+        bytes memory initData = abi.encodeWithSelector(GoldBridge.initialize.selector);
         ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation),
+            address(initGoldBridge),
             initData
         );
         bridge = GoldBridge(payable(address(proxy)));
-        console2.log("Bridge proxy at:", address(bridge));
 
-        // 5. Bridge Configuration
-        vm.startPrank(owner);
-        bridge.initialize();
-        require(bridge.owner() == owner, "Bridge init failed");
+        // 4) Configure le bridge
         token.setBridgeAddress(address(bridge));
-        vm.stopPrank();
+        bridge.setDestinationChainId(BSC_TESTNET_SELECTOR);
+        bridge.setRemoteContract(REMOTE_CONTRACT);
 
-        // 6. Final Setup
+        // 5) Setup les balances et les approbations
         vm.deal(address(bridge), BRIDGE_FUNDS);
         token.adminMint(alice, INITIAL_BALANCE);
-        vm.prank(alice);
-        token.approve(address(bridge), type(uint256).max);
         
-        console2.log("=== Setup Complete ===");
+        // Donner des LINK à Alice au lieu du bridge
+        linkToken.mint(alice, 100 ether);
+        
+        // Alice approuve le bridge pour les tokens et le LINK
+        vm.startPrank(alice);
+        token.approve(address(bridge), type(uint256).max);
+        linkToken.approve(address(bridge), type(uint256).max);
+        vm.stopPrank();
+
+        // Configurer le mock router
+        RouterMock(address(router)).setNextMessageId(bytes32(uint256(1)));
+        RouterMock(address(router)).setFees(0.01 ether);
     }
 
-    // Tests principaux
-    function testInitialState() public view {
+    function testInitialState() public {
         assertEq(address(bridge.router()), address(router));
         assertEq(address(bridge.goldToken()), address(token));
-        assertEq(bridge.destinationChainId(), destinationChainId);
-        assertEq(bridge.remoteContractOnDestinationChain(), remoteContract);
+        assertEq(bridge.destinationChainId(), BSC_TESTNET_SELECTOR);
+        assertEq(bridge.remoteContractOnDestinationChain(), REMOTE_CONTRACT);
     }
 
-    // Tests additionnels
+    function testBridgeOut() public {
+        uint256 amount = 1 ether;
+        uint256 fees = 0.01 ether;
+        uint256 initialTokenBalance = token.balanceOf(alice);
+        uint256 initialLinkBalance = linkToken.balanceOf(alice);
+
+        bytes32 expectedMessageId = bytes32(uint256(1));
+        RouterMock(address(router)).setNextMessageId(expectedMessageId);
+        RouterMock(address(router)).setFees(fees);
+
+        vm.prank(alice);
+        vm.expectEmit(true, true, true, true);
+        emit MessageSent(expectedMessageId, BSC_TESTNET_SELECTOR, alice, amount);
+        bridge.bridgeOut(alice, amount);
+
+        // Vérifiez les soldes finaux
+        assertEq(token.balanceOf(alice), initialTokenBalance - amount);
+        assertEq(linkToken.balanceOf(alice), initialLinkBalance - fees);
+        assertEq(linkToken.balanceOf(address(router)), fees); // Le router a reçu les fees
+    }
+
+    function testCcipReceive() public {
+        uint256 amount = 1 ether;
+        uint256 initialBalance = token.balanceOf(bob);
+        
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(0),
+            sourceChainSelector: BSC_TESTNET_SELECTOR,
+            sender: REMOTE_CONTRACT,
+            data: abi.encode(bob, amount),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        vm.prank(address(router));
+        vm.expectEmit(true, true, true, true);
+        emit TokensBridged(bob, amount);
+        bridge.ccipReceive(message);
+
+        assertEq(token.balanceOf(bob), initialBalance + amount);
+    }
+
     function testSetRemoteContract() public {
-        bytes memory newRemoteContract = "0x5678";
+        bytes memory newRemoteContract = hex"5678";
         vm.prank(bridge.owner());
         bridge.setRemoteContract(newRemoteContract);
         assertEq(bridge.remoteContractOnDestinationChain(), newRemoteContract);
@@ -118,26 +158,78 @@ contract GoldBridgeTest is Test {
         assertEq(bridge.destinationChainId(), newChainId);
     }
 
-    function testFailSetRemoteContractUnauthorized() public {
+    // Tests des cas d'erreur
+    function test_RevertWhen_InsufficientBalance() public {
+        uint256 amount = INITIAL_BALANCE + 1 ether;
+        
         vm.prank(alice);
-        bridge.setRemoteContract("0x5678");
+        vm.expectRevert(IGoldBridge.InsufficientBalance.selector);
+        bridge.bridgeOut(alice, amount);
     }
 
-    function testFailSetDestinationChainIdUnauthorized() public {
+    function test_RevertWhen_InsufficientFees() public {
+        uint256 amount = 1 ether;
+        uint256 fees = 200 ether; // Plus que le solde initial d'Alice (100 ether)
+        
+        // Brûle les LINK d'Alice en les envoyant à un autre compte
+        vm.startPrank(alice);
+        uint256 balance = linkToken.balanceOf(alice);
+        linkToken.transfer(makeAddr("burn"), balance);
+        vm.stopPrank();
+        
+        // Vérifie que le solde est à 0
+        assertEq(linkToken.balanceOf(alice), 0);
+        
+        // Configure des frais plus élevés que son solde
+        RouterMock(address(router)).setFees(fees);
+        
         vm.prank(alice);
-        bridge.setDestinationChainId(56);
+        vm.expectRevert(IGoldBridge.InsufficientFees.selector);
+        bridge.bridgeOut(alice, amount);
     }
 
-    function test_RevertWhen_SetRemoteContractUnauthorized() public {
+    function test_RevertWhen_UnauthorizedRouter() public {
+        uint256 amount = 1 ether;
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(0),
+            sourceChainSelector: BSC_TESTNET_SELECTOR,
+            sender: REMOTE_CONTRACT,
+            data: abi.encode(bob, amount),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
         vm.prank(alice);
-        vm.expectRevert();
-        bridge.setRemoteContract(hex"5678");
+        vm.expectRevert(IGoldBridge.UnauthorizedRouter.selector);
+        bridge.ccipReceive(message);
     }
 
-    function test_RevertWhen_SetDestinationChainIdUnauthorized() public {
-        vm.prank(alice);
-        vm.expectRevert();
-        bridge.setDestinationChainId(56);
+    function test_RevertWhen_InvalidRecipient() public {
+        uint256 amount = 1 ether;
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(0),
+            sourceChainSelector: BSC_TESTNET_SELECTOR,
+            sender: REMOTE_CONTRACT,
+            data: abi.encode(address(0), amount),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        vm.prank(address(router));
+        vm.expectRevert(IGoldBridge.InvalidRecipient.selector);
+        bridge.ccipReceive(message);
+    }
+
+    function test_RevertWhen_InvalidAmount() public {
+        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
+            messageId: bytes32(0),
+            sourceChainSelector: BSC_TESTNET_SELECTOR,
+            sender: REMOTE_CONTRACT,
+            data: abi.encode(bob, 0),
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        vm.prank(address(router));
+        vm.expectRevert(IGoldBridge.InvalidAmount.selector);
+        bridge.ccipReceive(message);
     }
 
     receive() external payable {}

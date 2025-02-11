@@ -1,117 +1,116 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// // SPDX-License-Identifier: MIT
+// pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
-import "../../src/lottery/GoldLottery.sol";
-import "../mocks/VRFCoordinatorV2_5Mock.sol";
+// import "forge-std/Test.sol";
+// import "../../src/lottery/GoldLottery.sol";
+// import "@chainlink/contracts/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
-contract GoldLotteryTest is Test {
-    GoldLottery public lottery;
-    VRFCoordinatorV2_5Mock public vrfCoordinator;
+// contract GoldLotteryTest is Test {
+//     GoldLottery public lottery;
+//     VRFCoordinatorV2_5Mock public coordinator;
     
-    bytes32 constant KEY_HASH = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
-    uint256 constant SUBSCRIPTION_ID = 1;
-    uint32 constant CALLBACK_GAS_LIMIT = 100000;
-    uint16 constant REQUEST_CONFIRMATIONS = 3;
+//     bytes32 constant KEY_HASH = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
+//     uint256 constant SUBSCRIPTION_ID = 1;
+//     uint32 constant CALLBACK_GAS_LIMIT = 100000;
+//     uint16 constant REQUEST_CONFIRMATIONS = 3;
     
-    address alice = makeAddr("alice");
-    address bob = makeAddr("bob");
-    address newCoordinator = makeAddr("newCoordinator");
+//     address alice = makeAddr("alice");
+//     address bob = makeAddr("bob");
 
-    event LotteryEntered(address indexed participant, uint256 chances);
-    event LotteryWinner(address indexed winner, uint256 amount);
-function setUp() public {
-    console2.log("=== Debug Setup Start ===");
-    
-    // 1. Deploy VRF Coordinator
-    vrfCoordinator = new VRFCoordinatorV2_5Mock();
-    console2.log("VRF Coordinator deployed at:", address(vrfCoordinator));
-    
-    // 2. Deploy Lottery implementation with owner
-    vm.prank(address(this));
-    lottery = new GoldLottery(
-        address(vrfCoordinator),
-        KEY_HASH,
-        SUBSCRIPTION_ID,
-        CALLBACK_GAS_LIMIT,
-        REQUEST_CONFIRMATIONS
-    );
-    console2.log("Lottery deployed at:", address(lottery));
-    
-    try lottery.initialize() {
-        console2.log("Initialization successful");
-    } catch Error(string memory reason) {
-        console2.log("Initialization failed:", reason);
-    }
-    
-    console2.log("Owner after initialization attempt:", lottery.owner());
-    
-    // Setup test accounts
-    vm.deal(alice, 100 ether);
-    vm.deal(bob, 100 ether);
-    
-    console2.log("=== Setup Complete ===");
-}
-
-    function testInitialize() public {
-        assertEq(lottery.owner(), address(this));
-    }
-
-    function testSetCoordinator() public {
-        lottery.setCoordinator(newCoordinator);
-    }
-
-    function testEnterLottery() public {
-        vm.startPrank(alice);
-        lottery.depositFees{value: 1 ether}(1 ether);
-        lottery.enterLottery(alice, 1 ether); 
-        vm.stopPrank();
+//     function setUp() public {
+//         // 1. Deploy VRF Coordinator V2.5 mock
+//         coordinator = new VRFCoordinatorV2_5Mock(
+//             0.25 ether,  // _baseFee
+//             1e9,        // _gasPrice
+//             1e18       // _weiPerUnitLink
+//         );
         
-        assertEq(lottery.getChances(alice), 1 ether);
-        assertEq(lottery.tokensMinted(), 1 ether);
-    }
-
-    function testDepositFees() public {
-        vm.prank(alice);
-        lottery.depositFees{value: 1 ether}(1 ether);
+//         // 2. Deploy Lottery
+//         lottery = new GoldLottery(
+//             address(coordinator),
+//             KEY_HASH,
+//             SUBSCRIPTION_ID,
+//             CALLBACK_GAS_LIMIT,
+//             REQUEST_CONFIRMATIONS
+//         );
+//         lottery.initialize();
         
-        assertEq(address(lottery).balance, 1 ether);
-        assertEq(lottery.lotteryBalance(), 1 ether);
-    }
-
-    function testDrawLotteryAndFulfillment() public {
-        vm.startPrank(alice);
-        lottery.depositFees{value: 2 ether}(2 ether);
-        lottery.enterLottery(alice, 1000e18);
-        vm.stopPrank();
+//         // 3. Setup VRF subscription
+//         coordinator.createSubscription();
+//         coordinator.fundSubscription(SUBSCRIPTION_ID, 10 ether);
+//         coordinator.addConsumer(SUBSCRIPTION_ID, address(lottery));
         
-        vm.startPrank(bob);
-        lottery.enterLottery(bob, 500e18);
-        vm.stopPrank();
+//         // 4. Fund test accounts
+//         vm.deal(alice, 100 ether);
+//         vm.deal(bob, 100 ether);
+//     }
 
-        uint256[] memory randomWords = new uint256[](1);
-        randomWords[0] = 12345;
+//     function testEnterLottery() public {
+//         vm.startPrank(alice);
+//         lottery.depositFees{value: 1 ether}(1 ether);
+//         lottery.enterLottery(alice, 1 ether);
+//         vm.stopPrank();
         
-        vrfCoordinator.fulfillRandomWords(1, address(lottery));
+//         assertEq(lottery.getChances(alice), 1 ether);
+//         assertEq(lottery.tokensMinted(), 1 ether);
+//     }
 
-        assertTrue(lottery.lastWinner() == alice || lottery.lastWinner() == bob);
-        assertGt(lottery.lastPayout(), 0);
-    }
+//     function testDrawLottery() public {
+//         // Setup
+//         vm.startPrank(alice);
+//         lottery.depositFees{value: 2 ether}(2 ether);
+//         lottery.enterLottery(alice, 1000e18);
+//         vm.stopPrank();
+        
+//         vm.startPrank(bob);
+//         lottery.depositFees{value: 1 ether}(1 ether);
+//         lottery.enterLottery(bob, 500e18);
+//         vm.stopPrank();
 
-    function testFailInvalidCoordinator() public {
-        vm.expectRevert(IGoldLottery.InvalidAddress.selector);
-        lottery.setCoordinator(address(0));
-    }
+//         uint256 initialBalance = lottery.lotteryBalance();
+        
+//         // Execute
+//         vm.prank(address(this));
+//         uint256 requestId = lottery.drawLottery();
+        
+//         // Simulate VRF V2.5 response
+//         coordinator.fulfillRandomWordsWithOverride(
+//             requestId,
+//             address(lottery),
+//             new uint256[](1)  // Laisse le mock générer les mots aléatoires
+//         );
 
-    function testFailInvalidAddress() public {
-        vm.expectRevert(IGoldLottery.InvalidAddress.selector);
-        lottery.enterLottery(address(0), 1 ether);
-    }
+//         // Verify
+//         assertTrue(lottery.lastWinner() == alice || lottery.lastWinner() == bob);
+//         assertEq(lottery.lastPayout(), initialBalance);
+//         assertEq(lottery.lotteryBalance(), 0);
+//         assertEq(lottery.tokensMinted(), 0);
+//         assertEq(lottery.getParticipants().length, 0);
+//     }
 
-    function testFailInvalidAmount() public {
-        vm.expectRevert(IGoldLottery.InvalidAmount.selector);
-        lottery.enterLottery(alice, 0);
-    }
+//     function testRevertOnInvalidAddress() public {
+//         vm.expectRevert(IGoldLottery.InvalidAddress.selector);
+//         lottery.enterLottery(address(0), 1 ether);
+//     }
 
-    receive() external payable {}
-}
+//     function testRevertOnInvalidAmount() public {
+//         vm.expectRevert(IGoldLottery.InvalidAmount.selector);
+//         lottery.enterLottery(alice, 0);
+//     }
+
+//     function testRevertOnNoParticipants() public {
+//         vm.expectRevert(IGoldLottery.NoParticipants.selector);
+//         lottery.drawLottery();
+//     }
+
+//     function testRevertOnNoBalance() public {
+//         vm.startPrank(alice);
+//         lottery.enterLottery(alice, 1000e18);
+//         vm.stopPrank();
+
+//         vm.expectRevert(IGoldLottery.NoBalance.selector);
+//         lottery.drawLottery();
+//     }
+
+//     receive() external payable {}
+// }

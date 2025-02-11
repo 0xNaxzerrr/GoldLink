@@ -38,6 +38,9 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         uint32 _callbackGasLimit,
         uint16 _requestConfirmations
     ) {
+        require(_callbackGasLimit >= 100000, "Callback gas limit too low");
+        require(_requestConfirmations >= 3, "Min confirmations not met");
+        
         vrfCoordinator = IVRFCoordinatorV2Plus(_vrfCoordinator);
         KEY_HASH = _keyHash;
         SUBSCRIPTION_ID = _subscriptionId;
@@ -67,7 +70,7 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         lotteryBalance += amount;
     }
 
-    function drawLottery() external onlyOwner returns (uint256) {
+    function drawLottery() external override onlyOwner returns (uint256) {
         return _drawLottery();
     }
 
@@ -150,10 +153,10 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         s_requests[requestId].fulfilled = true;
         s_requests[requestId].randomWords = randomWords;
         
-        delete participants;
         for (uint256 i = 0; i < participants.length; i++) {
             chances[participants[i]] = 0;
         }
+        delete participants;
         tokensMinted = 0;
         
         emit RequestFulfilled(requestId, randomWords);

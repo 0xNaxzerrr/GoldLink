@@ -18,6 +18,7 @@ interface IGoldLottery {
     function setCoordinator(address newCoordinator) external;
     function enterLottery(address participant, uint256 amount) external;
     function depositFees(uint256 amount) external payable;
+    // function drawLottery() external returns (uint256);  // Fonction manquante
     function getParticipants() external view returns (address[] memory);
     function getChances(address participant) external view returns (uint256);
 }
