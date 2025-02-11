@@ -14,8 +14,7 @@ interface IGoldLottery {
     event LotteryEntered(address indexed participant, uint256 chances);
     event LotteryWinner(address indexed winner, uint256 amount);
 
-    function initialize() external;
-    function setCoordinator(address newCoordinator) external;
+    // function setCoordinator(address newCoordinator) external;
     function enterLottery(address participant, uint256 amount) external;
     function depositFees(uint256 amount) external payable;
     // function drawLottery() external returns (uint256);  // Fonction manquante
