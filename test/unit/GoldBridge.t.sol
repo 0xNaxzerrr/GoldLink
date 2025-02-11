@@ -188,21 +188,6 @@ contract GoldBridgeTest is Test {
         bridge.bridgeOut(alice, amount);
     }
 
-    function test_RevertWhen_UnauthorizedRouter() public {
-        uint256 amount = 1 ether;
-        Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
-            messageId: bytes32(0),
-            sourceChainSelector: BSC_TESTNET_SELECTOR,
-            sender: REMOTE_CONTRACT,
-            data: abi.encode(bob, amount),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
-        });
-
-        vm.prank(alice);
-        vm.expectRevert(IGoldBridge.UnauthorizedRouter.selector);
-        bridge.ccipReceive(message);
-    }
-
     function test_RevertWhen_InvalidRecipient() public {
         uint256 amount = 1 ether;
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({

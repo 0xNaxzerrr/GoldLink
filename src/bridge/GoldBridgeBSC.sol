@@ -6,7 +6,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@chainlink/contracts/ccip/applications/CCIPReceiver.sol";
 import "@chainlink/contracts/ccip/interfaces/IRouterClient.sol";
 import "@chainlink/contracts/ccip/libraries/Client.sol";
-import "@chainlink/contracts/shared/interfaces/LinkTokenInterface.sol"; // <-- on importe l'interface LINK
+import "@chainlink/contracts/shared/interfaces/LinkTokenInterface.sol"; 
 import "../tokens/GoldTokenBSC.sol";
 import "../interfaces/IGoldBridgeBSC.sol";
 
@@ -25,7 +25,7 @@ contract GoldBridgeBSC is IGoldBridgeBSC, CCIPReceiver, OwnableUpgradeable, UUPS
     constructor(
         address _router,
         address _goldToken,
-        address _linkToken,                // <-- nouveau paramètre pour l'adresse LINK sur BSC
+        address _linkToken,
         bytes memory _remoteContract,
         uint64 _sepoliaChainId
     ) CCIPReceiver(_router) {

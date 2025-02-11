@@ -5,6 +5,7 @@ import "forge-std/Script.sol";
 import "forge-std/console2.sol";
 import "../src/bridge/GoldBridge.sol";
 import "../src/tokens/GoldToken.sol";
+import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract DeploySepoliaContracts is Script {
     address constant sepoliaRouter = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
@@ -33,15 +34,26 @@ contract DeploySepoliaContracts is Script {
             console2.log("Minting failed - continuing deployment");
         }
 
-        // Deploy bridge
-        GoldBridge goldBridge = new GoldBridge(
+        // 1. Déploie l'implémentation du bridge
+        GoldBridge implGoldBridge = new GoldBridge(
             sepoliaRouter,            
             address(goldToken),        
             linkToken, 
             abi.encodePacked(address(0)), 
             BNB_CHAIN_SELECTOR      
         );
-        goldBridge.initialize();
+
+        // 2. Prépare les données d'initialisation
+        bytes memory initData = abi.encodeCall(GoldBridge.initialize, ());
+
+        // 3. Déploie le proxy
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(implGoldBridge),
+            initData
+        );
+
+        // 4. Crée une interface pour interagir avec le proxy
+        GoldBridge goldBridge = GoldBridge(address(proxy));
         
         // Configure token avec l'adresse du bridge
         goldToken.setBridgeAddress(address(goldBridge));
@@ -49,7 +61,8 @@ contract DeploySepoliaContracts is Script {
 
         console2.log("Deployed on Sepolia:");
         console2.log("Token:", address(goldToken));
-        console2.log("Bridge:", address(goldBridge));
+        console2.log("GoldBridge:", address(implGoldBridge));
+        console2.log("Proxy:", address(proxy));
 
         vm.stopBroadcast();
     }

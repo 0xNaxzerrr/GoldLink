@@ -70,9 +70,9 @@ contract GoldLottery is IGoldLottery, OwnableUpgradeable, UUPSUpgradeable {
         lotteryBalance += amount;
     }
 
-    function drawLottery() external override onlyOwner returns (uint256) {
-        return _drawLottery();
-    }
+    // function drawLottery() external override onlyOwner returns (uint256) {
+    //     return _drawLottery();
+    // }
 
     function _drawLottery() private returns (uint256 requestId) {
         if (participants.length == 0) revert NoParticipants();
