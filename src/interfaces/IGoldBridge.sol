@@ -4,15 +4,15 @@ pragma solidity ^0.8.24;
 import "@chainlink/contracts/ccip/libraries/Client.sol";
 
 interface IGoldBridge {
-    error UnauthorizedRouter();
     error InvalidRecipient();
     error InvalidAmount();
     error InsufficientBalance();
     error InsufficientFees();
     error TransferFailed();
+    error UnauthorizedRouter(address sender);
+
     event RemoteContractSet(bytes remoteContract);
     event DestinationChainSet(uint64 chainId);
-    
     event MessageSent(
         bytes32 indexed messageId,
         uint64 indexed destinationChainId,
@@ -24,4 +24,5 @@ interface IGoldBridge {
     function bridgeOut(address recipient, uint256 amount) external;
     function setRemoteContract(bytes memory _remoteContract) external;
     function setDestinationChainId(uint64 _chainId) external;
+    function ccipReceive(Client.Any2EVMMessage calldata message) external;
 }

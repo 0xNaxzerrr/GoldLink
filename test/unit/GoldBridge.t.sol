@@ -18,12 +18,12 @@ contract GoldBridgeTest is Test {
     IRouterClient public router;
     LinkTokenMock public linkToken;
 
-    uint64 constant BSC_TESTNET_SELECTOR = 12532609583862916517;  
-    bytes constant REMOTE_CONTRACT = hex"1234567890abcdef1234567890abcdef12345678"; 
+    uint64 constant BSC_TESTNET_SELECTOR = 13264668187771770619;
+    bytes constant REMOTE_CONTRACT =
+        hex"1234567890abcdef1234567890abcdef12345678";
     uint256 constant INITIAL_BALANCE = 1000 ether;
     uint256 constant BRIDGE_FUNDS = 100 ether;
 
-    // Test addresses
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
     address owner = address(this);
@@ -40,7 +40,6 @@ contract GoldBridgeTest is Test {
         vm.warp(1000);
         console2.log("=== Debug Setup Start ===");
 
-        // 1) Déploie les mocks
         router = new RouterMock();
         linkToken = new LinkTokenMock();
 
@@ -49,7 +48,6 @@ contract GoldBridgeTest is Test {
         xauUsdFeed.setPrice(2000 * 1e8);
         ethUsdFeed.setPrice(3000 * 1e8);
 
-        // 2) Déploie et initialise le token
         token = new GoldToken(
             address(xauUsdFeed),
             address(ethUsdFeed),
@@ -57,7 +55,6 @@ contract GoldBridgeTest is Test {
         );
         token.initialize();
 
-        // 3) Déploie le bridge avec proxy
         initGoldBridge = new GoldBridge(
             address(router),
             address(token),
@@ -66,32 +63,29 @@ contract GoldBridgeTest is Test {
             BSC_TESTNET_SELECTOR
         );
 
-        bytes memory initData = abi.encodeWithSelector(GoldBridge.initialize.selector);
+        bytes memory initData = abi.encodeWithSelector(
+            GoldBridge.initialize.selector
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(initGoldBridge),
             initData
         );
         bridge = GoldBridge(payable(address(proxy)));
 
-        // 4) Configure le bridge
         token.setBridgeAddress(address(bridge));
         bridge.setDestinationChainId(BSC_TESTNET_SELECTOR);
         bridge.setRemoteContract(REMOTE_CONTRACT);
 
-        // 5) Setup les balances et les approbations
         vm.deal(address(bridge), BRIDGE_FUNDS);
         token.adminMint(alice, INITIAL_BALANCE);
-        
-        // Donner des LINK à Alice au lieu du bridge
+
         linkToken.mint(alice, 100 ether);
-        
-        // Alice approuve le bridge pour les tokens et le LINK
+
         vm.startPrank(alice);
         token.approve(address(bridge), type(uint256).max);
         linkToken.approve(address(bridge), type(uint256).max);
         vm.stopPrank();
 
-        // Configurer le mock router
         RouterMock(address(router)).setNextMessageId(bytes32(uint256(1)));
         RouterMock(address(router)).setFees(0.01 ether);
     }
@@ -115,19 +109,23 @@ contract GoldBridgeTest is Test {
 
         vm.prank(alice);
         vm.expectEmit(true, true, true, true);
-        emit MessageSent(expectedMessageId, BSC_TESTNET_SELECTOR, alice, amount);
+        emit MessageSent(
+            expectedMessageId,
+            BSC_TESTNET_SELECTOR,
+            alice,
+            amount
+        );
         bridge.bridgeOut(alice, amount);
 
-        // Vérifiez les soldes finaux
         assertEq(token.balanceOf(alice), initialTokenBalance - amount);
         assertEq(linkToken.balanceOf(alice), initialLinkBalance - fees);
-        assertEq(linkToken.balanceOf(address(router)), fees); // Le router a reçu les fees
+        assertEq(linkToken.balanceOf(address(router)), fees);
     }
 
     function testCcipReceive() public {
         uint256 amount = 1 ether;
         uint256 initialBalance = token.balanceOf(bob);
-        
+
         Client.Any2EVMMessage memory message = Client.Any2EVMMessage({
             messageId: bytes32(0),
             sourceChainSelector: BSC_TESTNET_SELECTOR,
@@ -158,10 +156,9 @@ contract GoldBridgeTest is Test {
         assertEq(bridge.destinationChainId(), newChainId);
     }
 
-    // Tests des cas d'erreur
     function test_RevertWhen_InsufficientBalance() public {
         uint256 amount = INITIAL_BALANCE + 1 ether;
-        
+
         vm.prank(alice);
         vm.expectRevert(IGoldBridge.InsufficientBalance.selector);
         bridge.bridgeOut(alice, amount);
@@ -169,20 +166,17 @@ contract GoldBridgeTest is Test {
 
     function test_RevertWhen_InsufficientFees() public {
         uint256 amount = 1 ether;
-        uint256 fees = 200 ether; // Plus que le solde initial d'Alice (100 ether)
-        
-        // Brûle les LINK d'Alice en les envoyant à un autre compte
+        uint256 fees = 200 ether;
+
         vm.startPrank(alice);
         uint256 balance = linkToken.balanceOf(alice);
         linkToken.transfer(makeAddr("burn"), balance);
         vm.stopPrank();
-        
-        // Vérifie que le solde est à 0
+
         assertEq(linkToken.balanceOf(alice), 0);
-        
-        // Configure des frais plus élevés que son solde
+
         RouterMock(address(router)).setFees(fees);
-        
+
         vm.prank(alice);
         vm.expectRevert(IGoldBridge.InsufficientFees.selector);
         bridge.bridgeOut(alice, amount);
@@ -199,7 +193,12 @@ contract GoldBridgeTest is Test {
         });
 
         vm.prank(alice);
-        vm.expectRevert(IGoldBridge.UnauthorizedRouter.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IGoldBridge.UnauthorizedRouter.selector,
+                alice
+            )
+        );
         bridge.ccipReceive(message);
     }
 
