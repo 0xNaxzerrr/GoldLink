@@ -1,107 +1,181 @@
-> Deploy contracts : 
+# GoldLink - Bridge Cross-chain avec Chainlink CCIP
 
-forge script script/DeployGoldToken.s.sol:DeployGoldToken \
-    --rpc-url $RPC_URL \
+Un système de bridge cross-chain permettant de transférer des tokens entre Sepolia et BSC Testnet utilisant Chainlink CCIP.
+
+## Prérequis
+
+```bash
+# Variables d'environnement nécessaires (.env)
+PRIVATE_KEY=<votre_clé_privée>
+RPC_URL_SEPOLIA=<url_rpc_sepolia>
+RPC_URL_BSC_TESTNET=<url_rpc_bsc_testnet>
+ETHERSCAN_API_KEY=<votre_clé_api>
+BSCSCAN_API_KEY=<votre_clé_api_bsc>
+```
+
+## Déploiement des Contrats
+
+### 1. Déploiement sur Sepolia
+
+```bash
+forge script script/DeploySepoliaContracts.s.sol:DeploySepoliaContracts \
+    --rpc-url $RPC_URL_SEPOLIA \
     --private-key $PRIVATE_KEY \
     --broadcast \
     --verify \
     --etherscan-api-key $ETHERSCAN_API_KEY
+```
 
-> GoldLottery deployed at: 0x18715183248AAef4687DEC37fBF792C1412b3b0B
-> GoldToken deployed at: 0xa360ecF90b6d94Edee7B1cA9447421A4F98b59A3
+### 2. Déploiement sur BSC Testnet
 
-> Send some ETH to the tokencontract
-
-cast send 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
-    --value 0.01ether \
+```bash
+forge script script/DeployBSCContracts.s.sol:DeployBSCContracts \
+    --rpc-url $RPC_URL_BSC_TESTNET \
     --private-key $PRIVATE_KEY \
-    --rpc-url $RPC_URL
+    --broadcast \
+    --verify \
+    --etherscan-api-key $BSCSCAN_API_KEY
+```
 
-> Check goldToken contract's balance :
+## Configuration des Bridges
 
-cast balance 0x18715183248AAef4687DEC37fBF792C1412b3b0B --rpc-url $RPC_URL
+### 1. Configuration du Bridge BSC
 
-> Check lottery contract's balance :
+```bash
+# 1.1 Configurer l'adresse source autorisée
+cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_BSC \
+    "setAuthorizedSourceAddress(address)" \
+    $GOLD_BRIDGE_SEPOLIA
 
-cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
-    "lotteryBalance()(uint256)" \
-    --rpc-url $RPC_URL
+# 1.2 Configurer le contrat distant
+cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_BSC \
+    "setRemoteContract(bytes)" \
+    $(cast abi-encode "f(address)" $GOLD_BRIDGE_SEPOLIA)
 
-> Check participants in the lottery : 
+# 1.3 Configurer le chain selector de Sepolia
+cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_BSC \
+    "setSepoliaChainId(uint64)" \
+    16015286601757825753
+```
 
-cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B "getParticipants()" --rpc-url $RPC_URL
+### 2. Configuration du Bridge Sepolia
 
-> Check his % of chances :
+```bash
+# 2.1 Configurer le contrat distant
+cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_SEPOLIA \
+    "setRemoteContract(bytes)" \
+    $(cast abi-encode "f(address)" $GOLD_BRIDGE_BSC)
 
-cast call 0x18715183248AAef4687DEC37fBF792C1412b3b0B \
-    "getChances(address)(uint256)" \
-    0xF389635f844DaA5051aF879a00077C6C9F2aA345 \
-    --rpc-url $RPC_URL
+# 2.2 Configurer le chain selector de BSC
+cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_SEPOLIA \
+    "setDestinationChainId(uint64)" \
+    13264668187771770619
+```
+
+## Vérification de la Configuration
+
+```bash
+# Vérifier la configuration BSC
+cast call $GOLD_BRIDGE_BSC "remoteContractOnSepoliaChain()(bytes)" --rpc-url $RPC_URL_BSC_TESTNET
+cast call $GOLD_BRIDGE_BSC "authorizedSourceAddress()(address)" --rpc-url $RPC_URL_BSC_TESTNET
+cast call $GOLD_BRIDGE_BSC "sepoliaChainId()(uint64)" --rpc-url $RPC_URL_BSC_TESTNET
+
+# Vérifier la configuration Sepolia
+cast call $GOLD_BRIDGE_SEPOLIA "remoteContractOnDestinationChain()(bytes)" --rpc-url $RPC_URL_SEPOLIA
+cast call $GOLD_BRIDGE_SEPOLIA "destinationChainId()(uint64)" --rpc-url $RPC_URL_SEPOLIA
+```
+
+## Utilisation du Bridge
+
+### Bridge Sepolia → BSC
+
+```bash
+# Transférer 1 GOLD token de Sepolia vers BSC
+cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_SEPOLIA \
+    "bridgeOut(address,uint256)" \
+    <ADRESSE_RECIPIENT> \
+    1000000000000000000
+```
+
+### Bridge BSC → Sepolia
+
+```bash
+# Transférer 1 GOLD token de BSC vers Sepolia
+cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
+    $GOLD_BRIDGE_BSC \
+    "bridgeBack(address,uint256)" \
+    <ADRESSE_RECIPIENT> \
+    1000000000000000000
+```
+
+## Vérification des Soldes
+
+```bash
+# Vérifier le solde GOLD sur Sepolia
+cast call $GOLD_TOKEN_SEPOLIA "balanceOf(address)(uint256)" <ADRESSE> --rpc-url $RPC_URL_SEPOLIA
+
+# Vérifier le solde GOLD sur BSC
+cast call $GOLD_TOKEN_BSC "balanceOf(address)(uint256)" <ADRESSE> --rpc-url $RPC_URL_BSC_TESTNET
+```
+
+## Architecture
+
+- **GoldToken (Sepolia)**: Token ERC20 avec mint basé sur le prix de l'or
+- **GoldTokenBSC**: Version BSC du token
+- **GoldBridge**: Bridge côté Sepolia qui gère les transferts vers BSC
+- **GoldBridgeBSC**: Bridge côté BSC qui gère les transferts vers Sepolia
+- **Chainlink CCIP**: Utilisé pour la communication cross-chain sécurisée
+
+## Notes Importantes
+
+1. Assurez-vous d'avoir suffisamment de LINK sur les deux réseaux
+2. Les transactions prennent généralement 2-3 minutes
+3. Les bridges utilisent le pattern UUPS pour les mises à niveau
+4. Les adresses sources sont vérifiées pour la sécurité
+
+    pense bete : 
+    BSC
+    cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY $GOLD_BRIDGE_BSC        "setAuthorizedSourceAddress(address)" $GOLD_BRIDGE_SEPOLIA
+
+    cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
+        $GOLD_BRIDGE_BSC \
+        "setRemoteContract(bytes)" \
+        $(cast abi-encode "f(address)" $GOLD_BRIDGE_SEPOLIA)
+
+    SEPOLIA
+        cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
+        $GOLD_BRIDGE_SEPOLIA \
+        "setRemoteContract(bytes)" \
+        $(cast abi-encode "f(address)" $GOLD_BRIDGE_BSC)
+        
 
 
-===============parti ju : =========================
+   ===================     BridgeOut : ================
 
-forge script script/DeployGoldToken.s.sol:DeployGoldToken     --rpc-url $RPC_URL_SEPOLIA     --private-key $PRIVATE_KEY     --broadcast     --verify     --etherscan-api-key $ETHERSCAN_API_KEY
-
-Script ran successfully.
-
+    MESSAGE ID : 0x1cf2832e5ce63995d8f6c2c6253bfe95a2b8893105788054e0eca60545ff1636
+    TX : [0x3940395f4930748267f1733d8e80d5c78b5a670c6244ea9038f98f8000802e78](https://ccip.chain.link/#/side-drawer/msg/0x9b3f782af56b1e3a5aa2d4b6b8785d980535ff6a36b8a99fc95d828f1aa606ac)
 
 
+       ===================     BridgeBack : ================
+
+    MESSAGE ID : 0xf12914357ac2106342184f4b767df04037e4c7b9d57a5c101510e319b39252ca
+    TX : [0xdc6a3a5450949df7b0c64b429aabc6fe066ecaf98672f0d0e7d2bb0e73c10be6](https://testnet.bscscan.com/tx/0x58b46441ab348d7f199abe949ac24bb7f4b7a0613fc335eb640be24ead706a4b)
 == Logs ==
-Created VRF subscription: 21590261458706400825049526808212813833048271768527266645185995564925556330768
+  Created VRF subscription: 71713578663295574710251398792567627846667888060653069655504016799701196913728
+  Funded subscription with 2 LINK
+  Added Lottery as VRF consumer
+  Deployed Lottery at: 0x324e3ec37929f028aC17be0C34de1250D8704807
+  VRF Subscription ID: 71713578663295574710251398792567627846667888060653069655504016799701196913728
 
 == Logs ==
   Initial tokens minted successfully
   Deployed on Sepolia:
-  Token: 0xc8efbAb8c4eC6B3cC3d0474232C3cc6edF07B15b
-  Bridge: 0xfAdFbe17e7a727CCE8ba3B39d8cf08e4f85A155b
-  Proxy: v
-
-== Logs ==
-  Deployed on BSC Testnet:
-  Token: 0x801345D1E72A4fC448C83df0aa6fbED9fBb2AA3D
-  Bridge: 0x640407DF965913fE6F2749d0B6D8FC5ee5803414
-  Router: 0xE1053aE1857476f36A3C62580FF9b016E8EE8F6f
-  LINK: 0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06
-
-cast send 0x84b9B910527Ad5C03A9Ca831909E21e236EA7b06   "transfer(address,uint256)"   0xD5FC983aFD9B836a99FB4f1cbACcD3b1201bC051   5000000000000000000   --rpc-url "$RPC_URL_BSC_TESTNET"   --private-key "$PRIVATE_KEY"
-
-====================== MODE D'EMPLOI =========================
-
-# Configurer l'adresse du contrat BSC dans le GoldBridge Sepolia
-cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
-    0xC482ab757Bcd25914E33Af8FD043EB8410150f7D \
-    "setRemoteContract(bytes)" \
-    $(cast abi-encode "f(address)" 0x40f35685b9e6F3F4d567224B6470d0a60581eB79)
-
-# Configurer le chainId de BSC Testnet (97)
-cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
-    0xC482ab757Bcd25914E33Af8FD043EB8410150f7D \
-    "setDestinationChainId(uint64)" 97
-
-    # Configurer l'adresse du contrat Sepolia dans le GoldBridgeBSC
-cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
-    0x40f35685b9e6F3F4d567224B6470d0a60581eB79 \
-    "setRemoteContract(bytes)" \
-    $(cast abi-encode "f(address)" 0xC482ab757Bcd25914E33Af8FD043EB8410150f7D)
-
-# Configurer le chainId de Sepolia (11155111)
-cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
-    0x40f35685b9e6F3F4d567224B6470d0a60581eB79 \
-    "setSepoliaChainId(uint64)" 11155111
-
-# Configurer l'adresse source autorisée
-cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
-    0x40f35685b9e6F3F4d567224B6470d0a60581eB79 \
-    "setAuthorizedSourceAddress(address)" \
-    0xC482ab757Bcd25914E33Af8FD043EB8410150f7D
-
-    # Envoyer des ETH au bridge Sepolia
-cast send --rpc-url $RPC_URL_SEPOLIA --private-key $PRIVATE_KEY \
-    0xC482ab757Bcd25914E33Af8FD043EB8410150f7D \
-    --value 0.1ether
-
-# Envoyer des BNB au bridge BSC
-cast send --rpc-url $RPC_URL_BSC_TESTNET --private-key $PRIVATE_KEY \
-    0x40f35685b9e6F3F4d567224B6470d0a60581eB79 \
-    --value 0.1ether
+  Token: 0x31cfae161560627e971Ba264382d0Dcf0c5D57eD
+  GoldBridge: 0xB976A047d32C711147D9529388F60B1A4b5CA5aE
+  Proxy: 0xDd9ca6C3665219fe71d3847CE8d5742d6ca84a02

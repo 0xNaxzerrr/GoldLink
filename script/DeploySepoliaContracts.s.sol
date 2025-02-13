@@ -11,7 +11,7 @@ contract DeploySepoliaContracts is Script {
     address constant sepoliaRouter = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
     address constant xauUsdFeed = 0xC5981F461d74c46eB4b0CF3f4Ec79f025573B0Ea;
     address constant ethUsdFeed = 0x694AA1769357215DE4FAC081bf1f309aDC325306;
-    address constant LOTTERY_ADDRESS = 0xC665024dcBAACF27AFfa62eb0F968D81E433AF92;
+    address constant LOTTERY_ADDRESS = 0x324e3ec37929f028aC17be0C34de1250D8704807;
     uint64 constant BNB_CHAIN_SELECTOR = 13264668187771770619;
     address constant linkToken = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
 
@@ -19,7 +19,6 @@ contract DeploySepoliaContracts is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        // Deploy token avec l'adresse de la lottery existante
         GoldToken goldToken = new GoldToken(
             xauUsdFeed,
             ethUsdFeed,
@@ -27,14 +26,12 @@ contract DeploySepoliaContracts is Script {
         );
         goldToken.initialize();
 
-        // Mint initial tokens
-        try goldToken.mint{value: 0.1 ether}() {
+       try goldToken.mint{value: 0.1 ether}() {
             console2.log("Initial tokens minted successfully");
         } catch {
             console2.log("Minting failed - continuing deployment");
         }
 
-        // 1. Déploie l'implémentation du bridge
         GoldBridge implGoldBridge = new GoldBridge(
             sepoliaRouter,            
             address(goldToken),        
@@ -43,19 +40,15 @@ contract DeploySepoliaContracts is Script {
             BNB_CHAIN_SELECTOR      
         );
 
-        // 2. Prépare les données d'initialisation
         bytes memory initData = abi.encodeCall(GoldBridge.initialize, ());
 
-        // 3. Déploie le proxy
         ERC1967Proxy proxy = new ERC1967Proxy(
             address(implGoldBridge),
             initData
         );
 
-        // 4. Crée une interface pour interagir avec le proxy
         GoldBridge goldBridge = GoldBridge(address(proxy));
         
-        // Configure token avec l'adresse du bridge
         goldToken.setBridgeAddress(address(goldBridge));
         goldToken.approve(address(goldBridge), type(uint256).max);
 

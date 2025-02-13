@@ -52,7 +52,6 @@ contract GoldBridgeBSC is IGoldBridgeBSC, CCIPReceiver, OwnableUpgradeable, UUPS
             revert InvalidSourceChain();
         }
 
-        // Vérifie que le "sender" correspond bien à la passerelle Sepolia autorisée
         if (abi.decode(message.sender, (address)) != authorizedSourceAddress) {
             revert InvalidSourceAddress();
         }
@@ -61,7 +60,6 @@ contract GoldBridgeBSC is IGoldBridgeBSC, CCIPReceiver, OwnableUpgradeable, UUPS
         if (recipient == address(0)) revert InvalidRecipient();
         if (amount == 0) revert InvalidAmount();
 
-        // Mint sur le token BSC
         goldToken.bridgeMint(recipient, amount);
         emit TokensBridged(recipient, amount);
     }
@@ -74,10 +72,8 @@ contract GoldBridgeBSC is IGoldBridgeBSC, CCIPReceiver, OwnableUpgradeable, UUPS
             revert InsufficientBalance();
         }
 
-        // 2) On burnFrom pour retirer les tokens à l'utilisateur
         goldToken.burnFrom(msg.sender, amount);
 
-        // 3) On construit le message CCIP
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
         bytes memory extraArgs = Client._argsToBytes(
             Client.EVMExtraArgsV1({gasLimit: 200_000})
@@ -91,30 +87,25 @@ contract GoldBridgeBSC is IGoldBridgeBSC, CCIPReceiver, OwnableUpgradeable, UUPS
             feeToken: address(linkToken)
         });
 
-        // 4) Récupère le montant de fees
         IRouterClient router_ = IRouterClient(getRouter());
         uint256 fees = router_.getFee(sepoliaChainId, message);
 
-        // 5) Vérifie que l'utilisateur a assez de LINK
         if (linkToken.balanceOf(msg.sender) < fees) {
             revert InsufficientFees();
         }
 
-        // 6) Transfert les LINK de l'utilisateur vers le bridge
         if (!linkToken.transferFrom(msg.sender, address(this), fees)) {
             revert TransferFailed();
         }
 
-        // 7) On approve le router pour qu'il prenne les fees en LINK
         linkToken.approve(address(router_), fees);
 
-        // 8) On envoie le message
         bytes32 messageId = router_.ccipSend(sepoliaChainId, message);
 
         emit MessageSent(messageId, sepoliaChainId, recipient, amount);
     }
 
-    // --------------------------- Configuration & Admin ---------------------------
+    // --------------------------- Config ---------------------------
 
     function setAuthorizedSourceAddress(address _sourceAddress) external override onlyOwner {
         if (_sourceAddress == address(0)) revert InvalidRecipient();

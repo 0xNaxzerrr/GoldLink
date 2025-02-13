@@ -38,14 +38,11 @@ contract GoldTokenBSC is IGoldTokenBSC, ERC20, Ownable {
     /// @param account Account to burn from
     /// @param amount Amount to burn
     function burnFrom(address account, uint256 amount) external override {
-        // Vérifie d'abord que c'est le bridge qui appelle
         if (msg.sender != bridge) revert UnauthorizedBridge();
         
-        // Vérifie ensuite l'allowance et brûle les tokens
         _spendAllowance(account, msg.sender, amount);
         _burn(account, amount);
         
-        // Émet l'événement BridgeBurn
         emit BridgeBurn(account, amount);
     }
 }

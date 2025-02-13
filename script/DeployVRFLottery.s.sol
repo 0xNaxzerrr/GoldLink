@@ -20,7 +20,6 @@ contract DeployVRFLottery is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        // Configure VRF Subscription
         uint256 subId = IVRFCoordinatorV2Plus(vrfCoordinator).createSubscription();
         console2.log("Created VRF subscription:", subId);
         
@@ -35,7 +34,6 @@ contract DeployVRFLottery is Script {
         );
         console2.log("Funded subscription with 2 LINK");
 
-        // Deploy Lottery
         GoldLottery goldLottery = new GoldLottery(
             vrfCoordinator,
             KEY_HASH,

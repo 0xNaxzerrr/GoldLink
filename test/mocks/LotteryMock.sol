@@ -23,6 +23,19 @@ contract LotteryMock is IGoldLottery {
         lotteryBalance += amount;
     }
 
+    // Ajout de la fonction manquante
+    function drawLottery() external returns (uint256) {
+        // Simulation simple d'un tirage
+        if (tokensMinted == 0) revert NoParticipants();
+        if (lotteryBalance == 0) revert NoBalance();
+        
+        lastPayout = lotteryBalance;
+        lotteryBalance = 0;
+        tokensMinted = 0;
+        
+        return 1; // ID de requête fictif
+    }
+
     function getParticipants() external pure returns (address[] memory) {
         address[] memory participants = new address[](0);
         return participants;

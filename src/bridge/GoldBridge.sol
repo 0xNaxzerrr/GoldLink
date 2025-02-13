@@ -53,12 +53,10 @@ contract GoldBridge is
     /// @notice Bridge des tokens vers BSC
     /// @dev Paiement des frais en LINK, pas en msg.value
     function bridgeOut(address recipient, uint256 amount) external override {
-        // 1. Vérifie le solde de tokens
         if (goldToken.balanceOf(msg.sender) < amount) {
             revert InsufficientBalance();
         }
 
-        // 2. Prépare le message CCIP
         Client.EVMTokenAmount[] memory tokenAmounts = new Client.EVMTokenAmount[](0);
         bytes memory extraArgs = Client._argsToBytes(
             Client.EVMExtraArgsV1({gasLimit: 200000})
@@ -72,23 +70,18 @@ contract GoldBridge is
             feeToken: address(linkToken)
         });
 
-        // 3. Calcule les frais LINK
         uint256 fees = router.getFee(destinationChainId, message);
 
-        // 4. Vérifie que l'utilisateur a assez de LINK
         if (linkToken.balanceOf(msg.sender) < fees) {
             revert InsufficientFees();
         }
 
-        // 5. Transfère les LINK de l'utilisateur au bridge
         if (!linkToken.transferFrom(msg.sender, address(this), fees)) {
             revert TransferFailed();
         }
 
-        // 6. Brûle les tokens
         goldToken.burnFrom(msg.sender, amount);
 
-        // 7. Envoie le message CCIP
         linkToken.approve(address(router), fees);
         bytes32 messageId = router.ccipSend(destinationChainId, message);
 
@@ -99,7 +92,6 @@ contract GoldBridge is
     function _ccipReceive(
         Client.Any2EVMMessage memory message
     ) internal override {
-        // Vérifie que le sender est le router
         if (msg.sender != address(router)) revert UnauthorizedRouter();
 
         (address recipient, uint256 amount) = abi.decode(
@@ -109,7 +101,6 @@ contract GoldBridge is
         if (recipient == address(0)) revert InvalidRecipient();
         if (amount == 0) revert InvalidAmount();
 
-        // Mint sur le token
         goldToken.bridgeMint(recipient, amount);
         emit TokensBridged(recipient, amount);
     }

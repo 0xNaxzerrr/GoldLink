@@ -4,9 +4,11 @@
 // import "forge-std/Test.sol";
 // import "../../src/lottery/GoldLottery.sol";
 // import "@chainlink/contracts/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+// import "../mocks/LotteryMock.sol";
 
 // contract GoldLotteryTest is Test {
 //     GoldLottery public lottery;
+//     LotteryMock public mockLottery;
 //     VRFCoordinatorV2_5Mock public coordinator;
     
 //     bytes32 constant KEY_HASH = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
@@ -18,14 +20,15 @@
 //     address bob = makeAddr("bob");
 
 //     function setUp() public {
-//         // 1. Deploy VRF Coordinator V2.5 mock
+//         // 1. Deploy mocks
 //         coordinator = new VRFCoordinatorV2_5Mock(
 //             0.25 ether,  // _baseFee
 //             1e9,        // _gasPrice
 //             1e18       // _weiPerUnitLink
 //         );
+//         mockLottery = new LotteryMock();
         
-//         // 2. Deploy Lottery
+//         // 2. Deploy Lottery avec le mock
 //         lottery = new GoldLottery(
 //             address(coordinator),
 //             KEY_HASH,
@@ -56,15 +59,19 @@
 //     }
 
 //     function testDrawLottery() public {
+//         console2.log("Starting lottery draw test...");
+        
 //         // Setup
 //         vm.startPrank(alice);
 //         lottery.depositFees{value: 2 ether}(2 ether);
 //         lottery.enterLottery(alice, 1000e18);
+//         console2.log("Alice entered with 1000e18 chances");
 //         vm.stopPrank();
         
 //         vm.startPrank(bob);
 //         lottery.depositFees{value: 1 ether}(1 ether);
 //         lottery.enterLottery(bob, 500e18);
+//         console2.log("Bob entered with 500e18 chances");
 //         vm.stopPrank();
 
 //         uint256 initialBalance = lottery.lotteryBalance();
@@ -110,6 +117,17 @@
 
 //         vm.expectRevert(IGoldLottery.NoBalance.selector);
 //         lottery.drawLottery();
+//     }
+
+//     function testLotteryMockInteraction() public {
+//         // Test que le mock fonctionne correctement
+//         vm.startPrank(alice);
+//         mockLottery.depositFees{value: 1 ether}(1 ether);
+//         mockLottery.enterLottery(alice, 1 ether);
+//         vm.stopPrank();
+
+//         assertEq(mockLottery.tokensMinted(), 1 ether);
+//         assertEq(mockLottery.lotteryBalance(), 1 ether);
 //     }
 
 //     receive() external payable {}
