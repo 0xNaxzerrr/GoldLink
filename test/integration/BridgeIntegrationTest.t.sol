@@ -18,7 +18,6 @@ contract BridgeIntegrationTest is Test {
     GoldToken public sepoliaToken;
     GoldTokenBSC public bscToken;
 
-    // Adresses réelles
     address constant SEPOLIA_ROUTER = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
     address constant BSC_ROUTER = 0xE1053aE1857476f36A3C62580FF9b016E8EE8F6f;
     address constant LINK_SEPOLIA = 0x779877A7B0D9E8603169DdbD7836e478b4624789;

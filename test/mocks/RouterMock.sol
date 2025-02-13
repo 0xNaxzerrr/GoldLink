@@ -20,13 +20,11 @@ contract RouterMock is IRouterClient {
         uint64 destinationChainSelector,
         Client.EVM2AnyMessage memory message
     ) external payable returns (bytes32) {
-        // Vérifie que nous avons l'allowance suffisante
         require(
             IERC20(message.feeToken).allowance(msg.sender, address(this)) >= fees,
             "Insufficient allowance"
         );
 
-        // Transfère les frais
         require(
             IERC20(message.feeToken).transferFrom(msg.sender, address(this), fees),
             "Fee transfer failed"
@@ -36,7 +34,7 @@ contract RouterMock is IRouterClient {
     }
 
     function isChainSupported(uint64 chainSelector) external view returns (bool) {
-        return true; // Pour les tests, on considère que toutes les chaînes sont supportées
+        return true; 
     }
 
     function setFees(uint256 _fees) external {
