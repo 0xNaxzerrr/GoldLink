@@ -40,23 +40,23 @@ contract DeployVRFLottery is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Créer un abonnement VRF
-        uint256 subId = IVRFCoordinatorV2Plus(VRF_COORDINATOR)
-            .createSubscription();
-        console2.log("Created VRF Subscription ID:", subId);
+        // uint256 subId = IVRFCoordinatorV2Plus(VRF_COORDINATOR)
+        //     .createSubscription();
+        // console2.log("Created VRF Subscription ID:", subId);
 
-        // Financer l'abonnement
-        LinkTokenInterface(LINK_TOKEN).transferAndCall(
-            VRF_COORDINATOR,
-            FUND_AMOUNT,
-            abi.encode(subId)
-        );
-        console2.log("Funded Subscription with LINK");
+        // // Financer l'abonnement
+        // LinkTokenInterface(LINK_TOKEN).transferAndCall(
+        //     VRF_COORDINATOR,
+        //     FUND_AMOUNT,
+        //     abi.encode(subId)
+        // );
+        // console2.log("Funded Subscription with LINK");
 
         // Déployer le contrat de loterie
         GoldLottery goldLottery = new GoldLottery(
             VRF_COORDINATOR,
             KEY_HASH,
-            subId,
+            31233842206509932406615927330398573920637033100254876621610548863769629996230,
             CALLBACK_GAS_LIMIT,
             REQUEST_CONFIRMATIONS
         );
@@ -64,7 +64,7 @@ contract DeployVRFLottery is Script {
 
         // Ajouter le contrat de loterie comme consommateur
         IVRFCoordinatorV2Plus(VRF_COORDINATOR).addConsumer(
-            subId,
+            31233842206509932406615927330398573920637033100254876621610548863769629996230,
             address(goldLottery)
         );
         console2.log("Added Lottery as VRF Consumer");
@@ -76,7 +76,9 @@ contract DeployVRFLottery is Script {
             uint64 reqCount,
             address owner,
             address[] memory consumers
-        ) = IVRFCoordinatorV2Plus(VRF_COORDINATOR).getSubscription(subId);
+        ) = IVRFCoordinatorV2Plus(VRF_COORDINATOR).getSubscription(
+                31233842206509932406615927330398573920637033100254876621610548863769629996230
+            );
 
         console2.log("Subscription Details:");
         console2.log("LINK Balance:", balance);
