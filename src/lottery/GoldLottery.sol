@@ -61,7 +61,7 @@ contract GoldLottery is IGoldLottery, VRFConsumerBaseV2Plus {
         lotteryBalance += amount;
     }
 
-    function drawLottery() external onlyOwner returns (uint256) {
+    function drawLottery() external returns (uint256) {
         return _drawLottery();
     }
 
