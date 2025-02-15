@@ -110,12 +110,15 @@ contract GoldLottery is IGoldLottery, VRFConsumerBaseV2Plus {
         uint256 randomChance = randomWord % totalChances;
         uint256 cumulativeChances = 0;
 
-        for (uint256 i = 0; i < participants.length; i++) {
+        uint256 participe = participants.length;
+        
+        for (uint256 i = 0; i < participe; i++) {
             cumulativeChances += chances[participants[i]];
             if (randomChance < cumulativeChances) {
                 return participants[i];
             }
         }
+
         return participants[participants.length - 1];
     }
 
