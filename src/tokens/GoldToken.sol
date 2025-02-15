@@ -131,7 +131,7 @@ contract GoldToken is
         uint256 gramGoldEth = (gramGoldUsd * 1e18) / ethUsd;
         if (gramGoldEth == 0) revert InvalidValue();
 
-        uint256 ethAmount = (amount * gramGoldEth) / 1e18;
+        uint256 ethAmount = (amount * gramGoldEth) / 1 ether ; // 
 
         uint256 feeTokens = (amount * FEE_PERCENTAGE) / 100;
         uint256 feeWei = (feeTokens * ethAmount) / amount;
