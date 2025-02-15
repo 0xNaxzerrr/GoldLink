@@ -3,113 +3,183 @@
 
 // import "forge-std/Test.sol";
 // import "../../src/lottery/GoldLottery.sol";
-// import "@chainlink/contracts/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 // contract GoldLotteryTest is Test {
 //     GoldLottery public lottery;
-//     VRFCoordinatorV2_5Mock public coordinator;
-    
-//     bytes32 constant KEY_HASH = 0x474e34a077df58807dbe9c96d3c009b23b3c6d0cce433e59bbf5b34f823bc56c;
-//     uint256 constant SUBSCRIPTION_ID = 1;
-//     uint32 constant CALLBACK_GAS_LIMIT = 100000;
-//     uint16 constant REQUEST_CONFIRMATIONS = 3;
-    
-//     address alice = makeAddr("alice");
-//     address bob = makeAddr("bob");
+
+//     address public constant PLAYER1 = address(1);
+//     address public constant PLAYER2 = address(2);
+//     address public constant PLAYER3 = address(3);
+//     address public constant VRF_COORDINATOR = address(0x100);
+
+//     bytes32 public constant KEY_HASH = keccak256("test_keyhash");
+//     uint64 public constant SUBSCRIPTION_ID = 1;
+//     uint32 public constant CALLBACK_GAS_LIMIT = 100000;
+//     uint16 public constant REQUEST_CONFIRMATIONS = 3;
+
+//     event LotteryEntered(address indexed participant, uint256 amount);
+//     event LotteryWinner(address indexed winner, uint256 prize);
+//     event RequestSent(uint256 indexed requestId, uint32 numWords);
+//     event RequestFulfilled(uint256 indexed requestId, uint256[] randomWords);
 
 //     function setUp() public {
-//         // 1. Deploy VRF Coordinator V2.5 mock
-//         coordinator = new VRFCoordinatorV2_5Mock(
-//             0.25 ether,  // _baseFee
-//             1e9,        // _gasPrice
-//             1e18       // _weiPerUnitLink
-//         );
-        
-//         // 2. Deploy Lottery
+//         // Deploy Lottery contract with mock VRF coordinator address
 //         lottery = new GoldLottery(
-//             address(coordinator),
+//             VRF_COORDINATOR,
 //             KEY_HASH,
 //             SUBSCRIPTION_ID,
 //             CALLBACK_GAS_LIMIT,
 //             REQUEST_CONFIRMATIONS
 //         );
-//         lottery.initialize();
-        
-//         // 3. Setup VRF subscription
-//         coordinator.createSubscription();
-//         coordinator.fundSubscription(SUBSCRIPTION_ID, 10 ether);
-//         coordinator.addConsumer(SUBSCRIPTION_ID, address(lottery));
-        
-//         // 4. Fund test accounts
-//         vm.deal(alice, 100 ether);
-//         vm.deal(bob, 100 ether);
+
+//         // Give test accounts some ETH
+//         vm.deal(PLAYER1, 10 ether);
+//         vm.deal(PLAYER2, 10 ether);
+//         vm.deal(PLAYER3, 10 ether);
+//         vm.deal(address(this), 10 ether);
 //     }
 
-//     function testEnterLottery() public {
-//         vm.startPrank(alice);
-//         lottery.depositFees{value: 1 ether}(1 ether);
-//         lottery.enterLottery(alice, 1 ether);
-//         vm.stopPrank();
-        
-//         assertEq(lottery.getChances(alice), 1 ether);
+//     function test_EnterLottery() public {
+//         vm.expectEmit(true, true, true, true);
+//         emit LotteryEntered(PLAYER1, 1 ether);
+
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 1 ether);
+
 //         assertEq(lottery.tokensMinted(), 1 ether);
+//         assertEq(lottery.getChances(PLAYER1), 1 ether);
+
+//         address[] memory participants = lottery.getParticipants();
+//         assertEq(participants.length, 1);
+//         assertEq(participants[0], PLAYER1);
 //     }
 
-//     function testDrawLottery() public {
-//         // Setup
-//         vm.startPrank(alice);
-//         lottery.depositFees{value: 2 ether}(2 ether);
-//         lottery.enterLottery(alice, 1000e18);
-//         vm.stopPrank();
-        
-//         vm.startPrank(bob);
-//         lottery.depositFees{value: 1 ether}(1 ether);
-//         lottery.enterLottery(bob, 500e18);
-//         vm.stopPrank();
+//     function test_EnterLotteryMultiplePlayers() public {
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 1 ether);
 
-//         uint256 initialBalance = lottery.lotteryBalance();
-        
-//         // Execute
-//         vm.prank(address(this));
-//         uint256 requestId = lottery.drawLottery();
-        
-//         // Simulate VRF V2.5 response
-//         coordinator.fulfillRandomWordsWithOverride(
-//             requestId,
-//             address(lottery),
-//             new uint256[](1)  // Laisse le mock générer les mots aléatoires
-//         );
+//         vm.prank(PLAYER2);
+//         lottery.enterLottery(PLAYER2, 2 ether);
 
-//         // Verify
-//         assertTrue(lottery.lastWinner() == alice || lottery.lastWinner() == bob);
-//         assertEq(lottery.lastPayout(), initialBalance);
-//         assertEq(lottery.lotteryBalance(), 0);
-//         assertEq(lottery.tokensMinted(), 0);
-//         assertEq(lottery.getParticipants().length, 0);
+//         assertEq(lottery.tokensMinted(), 3 ether);
+//         assertEq(lottery.getChances(PLAYER1), 1 ether);
+//         assertEq(lottery.getChances(PLAYER2), 2 ether);
+
+//         address[] memory participants = lottery.getParticipants();
+//         assertEq(participants.length, 2);
+//         assertEq(participants[0], PLAYER1);
+//         assertEq(participants[1], PLAYER2);
 //     }
 
-//     function testRevertOnInvalidAddress() public {
+//     function test_AccumulateChances() public {
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 1 ether);
+
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 2 ether);
+
+//         assertEq(lottery.tokensMinted(), 3 ether);
+//         assertEq(lottery.getChances(PLAYER1), 3 ether);
+
+//         address[] memory participants = lottery.getParticipants();
+//         assertEq(participants.length, 1);
+//     }
+
+//     function test_RevertWhen_EnterLotteryZeroAmount() public {
+//         vm.prank(PLAYER1);
+//         vm.expectRevert(IGoldLottery.InvalidAmount.selector);
+//         lottery.enterLottery(PLAYER1, 0);
+//     }
+
+//     function test_RevertWhen_EnterLotteryZeroAddress() public {
+//         vm.prank(PLAYER1);
 //         vm.expectRevert(IGoldLottery.InvalidAddress.selector);
 //         lottery.enterLottery(address(0), 1 ether);
 //     }
 
-//     function testRevertOnInvalidAmount() public {
-//         vm.expectRevert(IGoldLottery.InvalidAmount.selector);
-//         lottery.enterLottery(alice, 0);
+//     function test_DepositFees() public {
+//         lottery.depositFees{value: 1 ether}(1 ether);
+//         assertEq(lottery.lotteryBalance(), 1 ether);
 //     }
 
-//     function testRevertOnNoParticipants() public {
+//     function test_RevertWhen_InsufficientFeeDeposit() public {
+//         vm.expectRevert("Insufficient fee amount");
+//         lottery.depositFees{value: 0.5 ether}(1 ether);
+//     }
+
+//     function test_ReceiveEther() public {
+//         (bool success, ) = address(lottery).call{value: 1 ether}("");
+//         assertTrue(success);
+//         assertEq(lottery.lotteryBalance(), 1 ether);
+//     }
+
+//     function test_CompleteLotteryFlow() public {
+//         // Setup players with different chances
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 1 ether); // 1/3 chance
+
+//         vm.prank(PLAYER2);
+//         lottery.enterLottery(PLAYER2, 2 ether); // 2/3 chance
+
+//         // Add prize money
+//         lottery.depositFees{value: 5 ether}(5 ether);
+//         assertEq(lottery.lotteryBalance(), 5 ether);
+
+//         // Start lottery draw
+//         vm.prank(VRF_COORDINATOR); // Simulate VRF coordinator
+//         uint256 requestId = lottery.drawLottery();
+
+//         // Prepare random words response
+//         uint256[] memory randomWords = new uint256[](1);
+//         randomWords[0] = 12345; // This will determine the winner based on chances
+
+//         // Mock VRF callback
+//         vm.prank(VRF_COORDINATOR);
+//         lottery.fulfillRandomWords(requestId, randomWords);
+
+//         // Verify lottery state after draw
+//         assertEq(lottery.tokensMinted(), 0); // Tokens reset
+//         assertEq(lottery.lotteryBalance(), 0); // Prize distributed
+//         assertTrue(
+//             lottery.lastWinner() == PLAYER1 || lottery.lastWinner() == PLAYER2
+//         );
+//         assertEq(lottery.lastPayout(), 5 ether);
+
+//         // Verify winner got paid
+//         assertTrue(lottery.lastWinner().balance >= 5 ether);
+//     }
+
+//     function test_RevertWhen_DrawLotteryNoParticipants() public {
+//         vm.prank(VRF_COORDINATOR);
 //         vm.expectRevert(IGoldLottery.NoParticipants.selector);
 //         lottery.drawLottery();
 //     }
 
-//     function testRevertOnNoBalance() public {
-//         vm.startPrank(alice);
-//         lottery.enterLottery(alice, 1000e18);
-//         vm.stopPrank();
+//     function test_RevertWhen_DrawLotteryNoBalance() public {
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 1 ether);
 
+//         vm.prank(VRF_COORDINATOR);
 //         vm.expectRevert(IGoldLottery.NoBalance.selector);
 //         lottery.drawLottery();
+//     }
+
+//     function test_RevertWhen_UnauthorizedVRFCallback() public {
+//         // Setup valid lottery state
+//         vm.prank(PLAYER1);
+//         lottery.enterLottery(PLAYER1, 1 ether);
+//         lottery.depositFees{value: 1 ether}(1 ether);
+
+//         vm.prank(VRF_COORDINATOR);
+//         uint256 requestId = lottery.drawLottery();
+
+//         uint256[] memory randomWords = new uint256[](1);
+//         randomWords[0] = 12345;
+
+//         // Try to fulfill from unauthorized address
+//         vm.prank(PLAYER1);
+//         vm.expectRevert("Only VRF coordinator can fulfill");
+//         lottery.fulfillRandomWords(requestId, randomWords);
 //     }
 
 //     receive() external payable {}
